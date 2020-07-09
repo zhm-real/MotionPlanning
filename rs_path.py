@@ -3,7 +3,7 @@ import numpy as np
 
 
 # parameters initiation
-STEP_SIZE = 0.2
+STEP_SIZE = 0.1
 MAX_LENGTH = 1000.0
 PI = math.pi
 

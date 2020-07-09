@@ -117,8 +117,8 @@ def trailer_motion_model(x, y, yaw0, yaw1, D, d, L, delta):
 def check_trailer_collision(ox, oy, x, y, yaw0, yaw1, kdtree=None):
     if not kdtree:
         kdtree = []
-        for i in range(len(ox)):
-            kdtree.append((ox[i], oy[i]))
+        for oxx, oyy in zip(ox, oy):
+            kdtree.append((oxx, oyy))
 
     vrxt = [LTF, LTF, -LTB, -LTB, LTF]
     vryt = [-W / 2.0, W / 2.0, W / 2.0, -W / 2.0, -W / 2.0]

@@ -1,6 +1,7 @@
 import heapq
 import math
 import matplotlib.pyplot as plt
+import numpy as np
 
 
 class Node:
@@ -40,15 +41,14 @@ def calc_dist_policy(gx, gy, ox, oy, reso, vr):
     while True:
         if not open_set:
             break
-        cost, c_id = heapq.heappop(pq)
-        if c_id in open_set:
-            current = open_set[c_id]
-            closed_set[c_id] = current
-            open_set.pop(c_id)
-        else:
-            continue
 
-        for i, _ in enumerate(motion):
+        cost, c_id = heapq.heappop(pq)
+        current = open_set[c_id]
+
+        open_set.pop(c_id)
+        closed_set[c_id] = current
+
+        for i in range(nmotion):
             node = Node(current.x + motion[i][0],
                         current.y + motion[i][1],
                         current.cost + motion[i][2], c_id)
@@ -75,7 +75,7 @@ def calc_dist_policy(gx, gy, ox, oy, reso, vr):
 
 
 def calc_policy_map(closed_set, xw, yw, minx, miny):
-    pmap = [[float("inf") for _ in range(yw)] for _ in range(xw)]
+    pmap = [[np.inf for _ in range(yw)] for _ in range(xw)]
 
     for n in closed_set.values():
         pmap[n.x - minx][n.y - miny] = n.cost

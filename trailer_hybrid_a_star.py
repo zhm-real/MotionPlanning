@@ -91,13 +91,13 @@ def calc_hybrid_astar_path(sx, sy, syaw, syaw1, gx, gy, gyaw, gyaw1, ox, oy, xyr
     kdtree = []
     ox, oy = ox[:], oy[:]
 
-    for i in range(len(ox)):
-        kdtree.append((ox[i], oy[i]))
+    for x, y in zip(ox, oy):
+        kdtree.append((x, y))
 
     c = calc_config(ox, oy, xyreso, yawreso)
-    nstart = Node(round(sx / xyreso), round(sy / xyreso), round(syaw / yawreso),
+    nstart = Node(round(sx/xyreso), round(sy/xyreso), round(syaw/yawreso),
                   True, [sx], [sy], [syaw], [syaw1], [True], 0.0, 0.0, -1)
-    ngoal = Node(round(gx / xyreso), round(gy / xyreso), round(gyaw / yawreso),
+    ngoal = Node(round(gx/xyreso), round(gy/xyreso), round(gyaw/yawreso),
                  True, [gx], [gy], [gyaw], [gyaw1], [True], 0.0, 0.0, -1)
 
     h_dp = calc_holonomic_with_obstacle_heuristic(ngoal, ox, oy, xyreso)  # cost of each node
@@ -112,7 +112,7 @@ def calc_hybrid_astar_path(sx, sy, syaw, syaw1, gx, gy, gyaw, gyaw1, ox, oy, xyr
     nmotion = len(u)
 
     while True:
-        if not openset:
+        if len(openset) == 0:
             print("Error: Cannot find path, No open set")
             return []
 
@@ -225,7 +225,7 @@ def analystic_expantion(n, ngoal, c, ox, oy, kdtree):
     sy = n.y[-1]
     syaw = n.yaw[-1]
 
-    max_curvature = math.tan(MAX_STEER) / WB
+    max_curvature = math.tan(MAX_STEER)/WB
     paths = rs_path.calc_all_paths(sx, sy, syaw, ngoal.x[-1], ngoal.y[-1],
                                    ngoal.yaw[-1], max_curvature, step_size=MOTION_RESOLUTION)
     if len(paths) == 0:
@@ -344,7 +344,7 @@ def calc_next_node(current, c_id, u, d, c):
     addedcost += STEER_CHANGE_COST * abs(current.steer - u)
 
     # jacknif cost
-    addedcost += sum([abs(rs_path.pi_2_pi(x - y)) for x, y in zip(yawlist, yaw1list)])
+    addedcost += JACKKNIF_COST * sum([abs(rs_path.pi_2_pi(x - y)) for x, y in zip(yawlist, yaw1list)])
 
     cost = current.cost + addedcost
 
@@ -444,6 +444,7 @@ def get_final_path(closed, ngoal, nstart, c):
     ry = list(reversed(ry))
     ryaw = list(reversed(ryaw))
     ryaw1 = list(reversed(ryaw1))
+    direction = list(reversed(direction))
 
     direction[0] = direction[1]
 
@@ -474,7 +475,7 @@ def main():
     for i in range(-25, 25):
         ox.append(float(i))
         oy.append(15.0)
-
+    #
     for i in range(-25, -4):
         ox.append(float(i))
         oy.append(4.0)
@@ -486,14 +487,14 @@ def main():
     for i in range(-15, 4):
         ox.append(4.0)
         oy.append(float(i))
-
-    for i in range(4, 25):
-        ox.append(float(i))
-        oy.append(4.0)
-
-    for i in range(-4, 4):
-        ox.append(float(i))
-        oy.append(-15.0)
+    #
+    # for i in range(4, 25):
+    #     ox.append(float(i))
+    #     oy.append(4.0)
+    #
+    # for i in range(-4, 4):
+    #     ox.append(float(i))
+    #     oy.append(-15.0)
 
     oox = ox[:]
     ooy = oy[:]
@@ -511,31 +512,12 @@ def main():
     direction = path.direction
 
     # fig = plt.plot()
-    steer = 0.0
-    for ii in range(len(x)):
-        plt.cla()
-        plt.plot(oox, ooy, ".k")
-        plt.plot(x, y, "-r", label="Hybrid A* path")
-        plt.show()
-        # if ii < len(x) - 2:
-        #     k = (yaw[ii + 1] - yaw[ii]) / MOTION_RESOLUTION
-        #     if not direction[ii]:
-        #         k *= -1
-        #
-        #     steer = math.atan(WB * k, 1.0)
-        # else:
-        #     steer = 0.0
-        #
-        #     trailerlib.plot_trailer.(x[ii], y[ii], yaw[ii], yaw1[ii], steer)
-        #     grid(true)
-        #     axis("equal")
-        #     pause(0.0001)
-        #     end
-        #     println("Done")
-        #     axis("equal")
-        #     show()
-        #
-        #     println(PROGRAM_FILE, " Done!!")
+    # steer = 0.0
+    # for ii in range(len(x)):
+    #     plt.cla()
+    plt.plot(oox, ooy, ".k")
+    plt.plot(x, y, "-r", label="Hybrid A* path")
+    plt.show()
 
 
 if __name__ == '__main__':
