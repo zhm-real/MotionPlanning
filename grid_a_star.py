@@ -32,7 +32,7 @@ def calc_dist_policy(gx, gy, ox, oy, reso, vr):
     open_set[calc_index(ngoal, xw, minx, miny)] = ngoal
 
     motion = get_motion_model()
-    nmotion = len(motion[:, 1])
+    nmotion = len(motion)
 
     pq = []
     heapq.heappush(pq, (ngoal.cost, calc_index(ngoal, xw, minx, miny)))

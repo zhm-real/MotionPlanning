@@ -2,15 +2,10 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="ae53ac00-9fa3-45c1-96b9-0e1ae7113cc3" name="Default Changelist" comment="">
-      <change afterPath="$PROJECT_DIR$/trailerlib.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.gitattributes" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/dictionaries/Huiming_Zhou.xml" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/vcs.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/vcs.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/draw.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/grid_a_star.py" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/rs_path.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/grid_a_star.py" beforeDir="false" afterPath="$PROJECT_DIR$/grid_a_star.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/trailer_hybrid_a_star.py" beforeDir="false" afterPath="$PROJECT_DIR$/trailer_hybrid_a_star.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/trailerlib.py" beforeDir="false" afterPath="$PROJECT_DIR$/trailerlib.py" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
@@ -44,7 +39,7 @@
       </list>
     </option>
   </component>
-  <component name="RunManager" selected="Python.draw">
+  <component name="RunManager" selected="Python.trailer_hybrid_a_star">
     <configuration name="draw" type="PythonConfigurationType" factoryName="Python" temporary="true">
       <module name="HybridAstar" />
       <option name="INTERPRETER_OPTIONS" value="" />
@@ -87,8 +82,52 @@
       <option name="INPUT_FILE" value="" />
       <method v="2" />
     </configuration>
+    <configuration name="trailer_hybrid_a_star" type="PythonConfigurationType" factoryName="Python" temporary="true">
+      <module name="HybridAstar" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/trailer_hybrid_a_star.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
+    <configuration name="trailerlib" type="PythonConfigurationType" factoryName="Python" temporary="true">
+      <module name="HybridAstar" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/trailerlib.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
     <recent_temporary>
       <list>
+        <item itemvalue="Python.trailer_hybrid_a_star" />
+        <item itemvalue="Python.trailerlib" />
         <item itemvalue="Python.draw" />
         <item itemvalue="Python.grid_a_star" />
       </list>
