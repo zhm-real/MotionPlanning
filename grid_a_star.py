@@ -1,8 +1,3 @@
-"""
-A* calc_astar_path
-author: huiming zhou
-"""
-
 import heapq
 import math
 import matplotlib.pyplot as plt
