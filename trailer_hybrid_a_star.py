@@ -226,8 +226,8 @@ def analystic_expantion(n, ngoal, c, ox, oy, kdtree):
     syaw = n.yaw[-1]
 
     max_curvature = math.tan(MAX_STEER)/WB
-    paths = rs_path.calc_all_paths(sx, sy, syaw, ngoal.x[-1], ngoal.y[-1],
-                                   ngoal.yaw[-1], max_curvature, step_size=MOTION_RESOLUTION)
+    paths = rs_path.calc_all_paths(sx, sy, syaw, ngoal.x[-1], ngoal.y[-1], ngoal.yaw[-1],
+                                   max_curvature, step_size=MOTION_RESOLUTION)
     if len(paths) == 0:
         return None
 
@@ -237,23 +237,23 @@ def analystic_expantion(n, ngoal, c, ox, oy, kdtree):
         yaw1 = trailerlib.calc_trailer_yaw_from_xyyaw(path.x, path.y, path.yaw, n.yaw1[-1], steps)
         heapq.heappush(pathqueue, (calc_rs_path_cost(path, yaw1), path))
 
-    for i in range(len(pathqueue)):
-        _, path = heapq.heappop(pathqueue)
+    # for i in range(len(pathqueue)):
+    _, path = heapq.heappop(pathqueue)
 
-        steps = [MOTION_RESOLUTION*x for x in path.directions]
-        yaw1 = trailerlib.calc_trailer_yaw_from_xyyaw(path.x, path.y, path.yaw, n.yaw1[-1], steps)
-        ind = range(0, len(path.x), SKIP_COLLISION_CHECK)
+    steps = [MOTION_RESOLUTION * x for x in path.directions]
+    yaw1 = trailerlib.calc_trailer_yaw_from_xyyaw(path.x, path.y, path.yaw, n.yaw1[-1], steps)
+    ind = range(0, len(path.x), SKIP_COLLISION_CHECK)
 
-        pathx, pathy, pathyaw, pathyaw1 = [], [], [], []
+    pathx, pathy, pathyaw, pathyaw1 = [], [], [], []
 
-        for k in ind:
-            pathx.append(path.x[k])
-            pathy.append(path.y[k])
-            pathyaw.append(path.yaw[k])
-            pathyaw1.append(yaw1[k])
+    for k in ind:
+        pathx.append(path.x[k])
+        pathy.append(path.y[k])
+        pathyaw.append(path.yaw[k])
+        pathyaw1.append(yaw1[k])
 
-        if trailerlib.check_trailer_collision(ox, oy, pathx, pathy, pathyaw, pathyaw1, kdtree=kdtree):
-            return path
+    if trailerlib.check_trailer_collision(ox, oy, pathx, pathy, pathyaw, pathyaw1, kdtree=kdtree):
+        return path
 
     return None
 
@@ -395,7 +395,7 @@ def calc_config(ox, oy, xyreso, yawreso):
     ox.append(min_x_m)
     oy.append(min_y_m)
     ox.append(max_x_m)
-    ox.append(max_y_m)
+    oy.append(max_y_m)
 
     minx = round(min_x_m / xyreso)
     miny = round(min_y_m / xyreso)
@@ -472,29 +472,33 @@ def main():
 
     ox, oy = [], []
 
-    for i in range(-25, 25):
+    for i in range(-25, -23):
+        ox.append(float(i))
+        oy.append(15.0)
+
+    for i in range(0, 3):
+        ox.append(float(i))
+        oy.append(15.0)
+
+    for i in range(23, 25):
         ox.append(float(i))
         oy.append(15.0)
     #
-    for i in range(-25, -4):
+    for i in range(-25, -23):
         ox.append(float(i))
         oy.append(4.0)
 
-    for i in range(-15, 4):
-        ox.append(-4.0)
-        oy.append(float(i))
-
-    for i in range(-15, 4):
-        ox.append(4.0)
-        oy.append(float(i))
+    for i in range(-6, -4):
+        ox.append(float(i))
+        oy.append(4.0)
     #
-    # for i in range(4, 25):
-    #     ox.append(float(i))
-    #     oy.append(4.0)
+    # for i in range(-15, 5):
+    #     ox.append(-4.0)
+    #     oy.append(float(i))
     #
-    # for i in range(-4, 4):
-    #     ox.append(float(i))
-    #     oy.append(-15.0)
+    # for i in range(-15, 5):
+    #     ox.append(4.0)
+    #     oy.append(float(i))
 
     oox = ox[:]
     ooy = oy[:]
@@ -511,12 +515,27 @@ def main():
     yaw1 = path.yaw1
     direction = path.direction
 
-    # fig = plt.plot()
-    # steer = 0.0
-    # for ii in range(len(x)):
-    #     plt.cla()
-    plt.plot(oox, ooy, ".k")
-    plt.plot(x, y, "-r", label="Hybrid A* path")
+    steer = 0.0
+    for ii in range(len(x)):
+        plt.cla()
+        plt.plot(oox, ooy, ".k")
+        plt.plot(x, y, "-r", label="Hybrid A* path")
+
+        if ii < len(x) - 2:
+            k = (yaw[ii + 1] - yaw[ii]) / MOTION_RESOLUTION
+            if ~direction[ii]:
+                k *= -1
+            steer = math.atan2(WB * k, 1.0)
+        else:
+            steer = 0.0
+        trailerlib.plot_trailer(gx, gy, gyaw0, gyaw1, 0.0)
+        trailerlib.plot_trailer(x[ii], y[ii], yaw[ii], yaw1[ii], steer)
+        plt.grid(True)
+        plt.axis("equal")
+        plt.pause(0.0001)
+
+    print("Done")
+    plt.axis("equal")
     plt.show()
 
 

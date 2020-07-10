@@ -6,7 +6,6 @@
       <change beforePath="$PROJECT_DIR$/grid_a_star.py" beforeDir="false" afterPath="$PROJECT_DIR$/grid_a_star.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/rs_path.py" beforeDir="false" afterPath="$PROJECT_DIR$/rs_path.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/trailer_hybrid_a_star.py" beforeDir="false" afterPath="$PROJECT_DIR$/trailer_hybrid_a_star.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/trailerlib.py" beforeDir="false" afterPath="$PROJECT_DIR$/trailerlib.py" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
@@ -27,6 +26,10 @@
   <component name="ProjectId" id="1eQmvqb9DsQWOHTWvcrOyPQ4cVU" />
   <component name="ProjectLevelVcsManager">
     <ConfirmationsSetting value="2" id="Add" />
+  </component>
+  <component name="PropertiesComponent">
+    <property name="last_opened_file_path" value="$PROJECT_DIR$/../ReedsSheppCurves" />
+    <property name="restartRequiresConfirmation" value="false" />
   </component>
   <component name="RunDashboard">
     <option name="ruleStates">

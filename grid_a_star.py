@@ -39,7 +39,7 @@ def calc_dist_policy(gx, gy, ox, oy, reso, vr):
     heapq.heappush(pq, (ngoal.cost, calc_index(ngoal, xw, minx, miny)))
 
     while True:
-        if not open_set:
+        if len(open_set) == 0:
             break
 
         cost, c_id = heapq.heappop(pq)
