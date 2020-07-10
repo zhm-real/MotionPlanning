@@ -2,25 +2,27 @@ import numpy as np
 import math
 import matplotlib.pyplot as plt
 import heapq
+import scipy.spatial.kdtree as KD
 
 import grid_a_star
 import rs_path
 import trailerlib
 
+
 PI = np.pi
 
-XY_GRID_RESOLUTION = 2.0  # [m]
-YAW_GRID_RESOLUTION = np.deg2rad(15.0)  # [rad]
+XY_RESO = 2.0  # [m]
+YAW_RESO = np.deg2rad(15.0)  # [rad]
 GOAL_TYAW_TH = np.deg2rad(5.0)  # [rad]
-MOTION_RESOLUTION = 0.1  # [m] path interporate resolution
+Motion_RESO = 0.1  # [m] path interporate resolution
 N_STEER = 20.0  # number of steer command
-EXTEND_AREA = 5.0  # [m] map extend length
+EXTEND_LEN = 5.0  # [m] map extend length
 SKIP_COLLISION_CHECK = 4  # skip number for collision check
 
-SB_COST = 100.0  # switch back penalty cost
-BACK_COST = 5.0  # backward penalty cost
+SWITCH_BACK_COST = 100.0  # switch back penalty cost
+BACKWARD_COST = 5.0  # backward penalty cost
 STEER_CHANGE_COST = 5.0  # steer angle change penalty cost
-STEER_COST = 1.0  # steer angle penalty cost
+STEER_ANGLE_COST = 1.0  # steer angle penalty cost
 JACKKNIF_COST = 200.0  # Jackknif cost
 H_COST = 5.0  # Heuristic cost
 
@@ -75,30 +77,36 @@ class Path:
         self.cost = cost
 
 
-def calc_hybrid_astar_path(sx, sy, syaw, syaw1, gx, gy, gyaw, gyaw1, ox, oy, xyreso, yawreso):
+def calc_hybrid_astar_path(sx, sy, syaw, syawt, gx, gy, gyaw, gyawt, ox, oy, xyreso, yawreso):
     """
     sx: start x position [m]
     sy: start y position [m]
+    syaw: start yaw angle [rad]
+    syawt: start trailer yaw angle [m]
     gx: goal x position [m]
     gx: goal x position [m]
+    gyaw: goal yaw angle [m]
+    gyawt: goal trailer yaw angle [m]
     ox: x position list of Obstacles [m]
     oy: y position list of Obstacles [m]
     xyreso: grid resolution [m]
     yawreso: yaw angle resolution [rad]
     """
 
-    syaw, gyaw = rs_path.pi_2_pi(syaw), rs_path.pi_2_pi(gyaw)
-    kdtree = []
-    ox, oy = ox[:], oy[:]
+    syaw = rs_path.pi_2_pi(syaw)
+    gyaw = rs_path.pi_2_pi(gyaw)
+    
+    obs = [[x, y] for x, y in zip(ox, oy)]
 
-    for x, y in zip(ox, oy):
-        kdtree.append((x, y))
+    kdtree = KD.KDTree(obs)
+
+    ox, oy = ox[:], oy[:]
 
     c = calc_config(ox, oy, xyreso, yawreso)
     nstart = Node(round(sx/xyreso), round(sy/xyreso), round(syaw/yawreso),
-                  True, [sx], [sy], [syaw], [syaw1], [True], 0.0, 0.0, -1)
+                  True, [sx], [sy], [syaw], [syawt], [True], 0.0, 0.0, -1)
     ngoal = Node(round(gx/xyreso), round(gy/xyreso), round(gyaw/yawreso),
-                 True, [gx], [gy], [gyaw], [gyaw1], [True], 0.0, 0.0, -1)
+                 True, [gx], [gy], [gyaw], [gyawt], [True], 0.0, 0.0, -1)
 
     h_dp = calc_holonomic_with_obstacle_heuristic(ngoal, ox, oy, xyreso)  # cost of each node
 
@@ -122,7 +130,7 @@ def calc_hybrid_astar_path(sx, sy, syaw, syaw1, gx, gy, gyaw, gyaw1, ox, oy, xyr
         openset.pop(c_id)
         closed_set[c_id] = current
 
-        isupdated, fpath = update_node_with_analystic_expantion(current, ngoal, c, ox, oy, kdtree, gyaw1)
+        isupdated, fpath = update_node_with_analystic_expantion(current, ngoal, c, ox, oy, kdtree, gyawt)
         if isupdated:
             fnode = fpath
             break
@@ -161,7 +169,7 @@ def update_node_with_analystic_expantion(current, ngoal, c, ox, oy, kdtree, gyaw
         fx = apath.x[1:len(apath.x)]
         fy = apath.y[1:len(apath.y)]
         fyaw = apath.yaw[1:len(apath.yaw)]
-        steps = [MOTION_RESOLUTION*x for x in apath.directions]
+        steps = [Motion_RESO * x for x in apath.directions]
         yaw1 = trailerlib.calc_trailer_yaw_from_xyyaw(apath.x, apath.y, apath.yaw, current.yaw1[-1], steps)
         if abs(rs_path.pi_2_pi(yaw1[-1] - gyaw1)) >= GOAL_TYAW_TH:
             return False, None  # no update
@@ -193,15 +201,15 @@ def calc_rs_path_cost(rspath, yaw1):
         if length >= 0:
             cost += 1
         else:
-            cost += abs(length) * BACK_COST
+            cost += abs(length) * BACKWARD_COST
 
     for i in range(len(rspath.lengths) - 1):
         if rspath.lengths[i] * rspath.lengths[i + 1] < 0.0:
-            cost += SB_COST
+            cost += SWITCH_BACK_COST
 
     for ctype in rspath.ctypes:
         if ctype != "S":
-            cost += STEER_COST * abs(MAX_STEER)
+            cost += STEER_ANGLE_COST * abs(MAX_STEER)
 
     nctypes = len(rspath.ctypes)
     ulist = [0.0 for _ in range(nctypes)]
@@ -227,20 +235,20 @@ def analystic_expantion(n, ngoal, c, ox, oy, kdtree):
 
     max_curvature = math.tan(MAX_STEER)/WB
     paths = rs_path.calc_all_paths(sx, sy, syaw, ngoal.x[-1], ngoal.y[-1], ngoal.yaw[-1],
-                                   max_curvature, step_size=MOTION_RESOLUTION)
+                                   max_curvature, step_size=Motion_RESO)
     if len(paths) == 0:
         return None
 
     pathqueue = []
     for path in paths:
-        steps = [MOTION_RESOLUTION*x for x in path.directions]
+        steps = [Motion_RESO * x for x in path.directions]
         yaw1 = trailerlib.calc_trailer_yaw_from_xyyaw(path.x, path.y, path.yaw, n.yaw1[-1], steps)
         heapq.heappush(pathqueue, (calc_rs_path_cost(path, yaw1), path))
 
     # for i in range(len(pathqueue)):
     _, path = heapq.heappop(pathqueue)
 
-    steps = [MOTION_RESOLUTION * x for x in path.directions]
+    steps = [Motion_RESO * x for x in path.directions]
     yaw1 = trailerlib.calc_trailer_yaw_from_xyyaw(path.x, path.y, path.yaw, n.yaw1[-1], steps)
     ind = range(0, len(path.x), SKIP_COLLISION_CHECK)
 
@@ -280,7 +288,7 @@ def verify_index(node, c, ox, oy, inityaw1, kdtree):
         return False
 
     # check collisiton
-    steps = [MOTION_RESOLUTION*x for x in node.directions]
+    steps = [Motion_RESO * x for x in node.directions]
     yaw1 = trailerlib.calc_trailer_yaw_from_xyyaw(node.x, node.y, node.yaw, inityaw1, steps)
 
     ind = range(0, len(node.x), SKIP_COLLISION_CHECK)
@@ -300,25 +308,25 @@ def verify_index(node, c, ox, oy, inityaw1, kdtree):
 
 
 def calc_next_node(current, c_id, u, d, c):
-    arc_l = XY_GRID_RESOLUTION * 1.5
+    arc_l = XY_RESO * 1.5
 
-    nlist = int(arc_l / MOTION_RESOLUTION) + 1
+    nlist = int(arc_l / Motion_RESO) + 1
     xlist = [0.0 for _ in range(nlist)]
     ylist = [0.0 for _ in range(nlist)]
     yawlist = [0.0 for _ in range(nlist)]
     yaw1list = [0.0 for _ in range(nlist)]
 
-    xlist[0] = current.x[-1] + d * MOTION_RESOLUTION * math.cos(current.yaw[-1])
-    ylist[0] = current.y[-1] + d * MOTION_RESOLUTION * math.sin(current.yaw[-1])
-    yawlist[0] = rs_path.pi_2_pi(current.yaw[-1] + d * MOTION_RESOLUTION / WB * math.tan(u))
+    xlist[0] = current.x[-1] + d * Motion_RESO * math.cos(current.yaw[-1])
+    ylist[0] = current.y[-1] + d * Motion_RESO * math.sin(current.yaw[-1])
+    yawlist[0] = rs_path.pi_2_pi(current.yaw[-1] + d * Motion_RESO / WB * math.tan(u))
     yaw1list[0] = rs_path.pi_2_pi(
-        current.yaw1[-1] + d * MOTION_RESOLUTION / LT * math.sin(current.yaw[-1] - current.yaw1[-1]))
+        current.yaw1[-1] + d * Motion_RESO / LT * math.sin(current.yaw[-1] - current.yaw1[-1]))
 
     for i in range(nlist - 1):
-        xlist[i + 1] = xlist[i] + d * MOTION_RESOLUTION * math.cos(yawlist[i])
-        ylist[i + 1] = ylist[i] + d * MOTION_RESOLUTION * math.sin(yawlist[i])
-        yawlist[i + 1] = rs_path.pi_2_pi(yawlist[i] + d * MOTION_RESOLUTION / WB * math.tan(u))
-        yaw1list[i + 1] = rs_path.pi_2_pi(yaw1list[i] + d * MOTION_RESOLUTION / LT * math.sin(yawlist[i] - yaw1list[i]))
+        xlist[i + 1] = xlist[i] + d * Motion_RESO * math.cos(yawlist[i])
+        ylist[i + 1] = ylist[i] + d * Motion_RESO * math.sin(yawlist[i])
+        yawlist[i + 1] = rs_path.pi_2_pi(yawlist[i] + d * Motion_RESO / WB * math.tan(u))
+        yaw1list[i + 1] = rs_path.pi_2_pi(yaw1list[i] + d * Motion_RESO / LT * math.sin(yawlist[i] - yaw1list[i]))
 
     xind = round(xlist[-1] / c.xyreso)
     yind = round(ylist[-1] / c.xyreso)
@@ -331,14 +339,14 @@ def calc_next_node(current, c_id, u, d, c):
         addedcost += abs(arc_l)
     else:
         direction = False
-        addedcost += abs(arc_l) * BACK_COST
+        addedcost += abs(arc_l) * BACKWARD_COST
 
     # swich back penalty
     if direction != current.direction:  # switch back penalty
-        addedcost += SB_COST
+        addedcost += SWITCH_BACK_COST
 
     # steer penalyty
-    addedcost += STEER_COST * abs(u)
+    addedcost += STEER_ANGLE_COST * abs(u)
 
     # steer change penalty
     addedcost += STEER_CHANGE_COST * abs(current.steer - u)
@@ -387,10 +395,10 @@ def calc_holonomic_with_obstacle_heuristic(gnode, ox, oy, xyreso):
 
 
 def calc_config(ox, oy, xyreso, yawreso):
-    min_x_m = min(ox) - EXTEND_AREA
-    min_y_m = min(oy) - EXTEND_AREA
-    max_x_m = max(ox) + EXTEND_AREA
-    max_y_m = max(oy) + EXTEND_AREA
+    min_x_m = min(ox) - EXTEND_LEN
+    min_y_m = min(oy) - EXTEND_LEN
+    max_x_m = max(ox) + EXTEND_LEN
+    max_y_m = max(oy) + EXTEND_LEN
 
     ox.append(min_x_m)
     oy.append(min_y_m)
@@ -504,7 +512,7 @@ def main():
     ooy = oy[:]
 
     path = calc_hybrid_astar_path(sx, sy, syaw0, syaw1, gx, gy, gyaw0,
-                                  gyaw1, ox, oy, XY_GRID_RESOLUTION, YAW_GRID_RESOLUTION)
+                                  gyaw1, ox, oy, XY_RESO, YAW_RESO)
 
     plt.plot(oox, ooy, ".k")
     trailerlib.plot_trailer(sx, sy, syaw0, syaw1, 0.0)
@@ -522,7 +530,7 @@ def main():
         plt.plot(x, y, "-r", label="Hybrid A* path")
 
         if ii < len(x) - 2:
-            k = (yaw[ii + 1] - yaw[ii]) / MOTION_RESOLUTION
+            k = (yaw[ii + 1] - yaw[ii]) / Motion_RESO
             if ~direction[ii]:
                 k *= -1
             steer = math.atan2(WB * k, 1.0)

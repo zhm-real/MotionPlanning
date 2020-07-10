@@ -1,6 +1,7 @@
 import numpy as np
 import math
 import matplotlib.pyplot as plt
+import scipy.spatial.kdtree as KD
 
 PI = math.pi
 
@@ -30,30 +31,18 @@ def check_collision(x, y, yaw, kdtree, ox, oy, wbd, wbr, vrx, vry):
         cx = ix + wbd * math.cos(iyaw)
         cy = iy + wbd * math.sin(iyaw)
 
-        ids = inrange(kdtree, [cx, cy], wbr)
+        ids = kdtree.query_ball_point([cx, cy], wbr)
 
         if len(ids) == 0:
             continue
 
-        obsx, obsy = [], []
-        for i in ids:
-            obsx.append(ox[i])
-            obsy.append(oy[i])
+        obsx = [ox[i] for i in ids]
+        obsy = [oy[i] for i in ids]
 
         if not rect_check(ix, iy, iyaw, obsx, obsy, vrx, vry):
             return False
 
     return True
-
-
-def inrange(kdtree, c, wbr):
-    ind_list = []
-
-    for i in range(len(kdtree)):
-        if math.hypot(kdtree[i][0] - c[0], kdtree[i][1] - c[1]) < wbr:
-            ind_list.append(i)
-
-    return ind_list
 
 
 def rect_check(ix, iy, iyaw, ox, oy, vrx, vry):
@@ -116,9 +105,8 @@ def trailer_motion_model(x, y, yaw0, yaw1, D, d, L, delta):
 
 def check_trailer_collision(ox, oy, x, y, yaw0, yaw1, kdtree=None):
     if not kdtree:
-        kdtree = []
-        for oxx, oyy in zip(ox, oy):
-            kdtree.append((oxx, oyy))
+        obs = [[x, y] for x, y in zip(ox, oy)]
+        kdtree = KD.KDTree(obs)
 
     vrxt = [LTF, LTF, -LTB, -LTB, LTF]
     vryt = [-W / 2.0, W / 2.0, W / 2.0, -W / 2.0, -W / 2.0]

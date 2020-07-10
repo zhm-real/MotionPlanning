@@ -1,3 +1,4 @@
+import time
 import math
 import numpy as np
 
@@ -662,3 +663,25 @@ def check_path(sx, sy, syaw, gx, gy, gyaw, maxc):
 
         for i in range(len(d)):
             assert abs(d[i] - STEP_SIZE) <= 0.001
+
+
+def main():
+    start_x = 3.0  # [m]
+    start_y = 10.0  # [m]
+    start_yaw = np.deg2rad(40.0)  # [rad]
+    end_x = 0.0  # [m]
+    end_y = 1.0  # [m]
+    end_yaw = np.deg2rad(0.0)  # [rad]
+    max_curvature = 0.1
+
+    t0 = time.time()
+
+    for i in range(1000):
+        _ = calc_optimal_path(start_x, start_y, start_yaw, end_x, end_y, end_yaw, max_curvature)
+
+    t1 = time.time()
+    print(t1 - t0)
+
+
+if __name__ == '__main__':
+    main()
