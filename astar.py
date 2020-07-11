@@ -86,7 +86,7 @@ def astar_planning(sx, sy, gx, gy, ox, oy, reso, rr):
     return pathx, pathy
 
 
-def calc_holonomic_with_obs_heuristic(node, ox, oy, reso, rr):
+def calc_holonomic_heuristic_with_obstacle(node, ox, oy, reso, rr):
     n_goal = Node(round(node.x[-1] / reso), round(node.y[-1] / reso), 0.0, -1)
 
     ox = [x / reso for x in ox]
