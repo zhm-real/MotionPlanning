@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import heapq
 import scipy.spatial.kdtree as KD
 
-import grid_a_star
+import astar
 import rs_path
 import trailerlib
 
@@ -106,7 +106,7 @@ def calc_hybrid_astar_path(sx, sy, syaw, syawt, gx, gy, gyaw, gyawt, ox, oy, xyr
     ngoal = Node(round(gx/xyreso), round(gy/xyreso), round(gyaw/yawreso),
                  True, [gx], [gy], [gyaw], [gyawt], [True], 0.0, 0.0, -1)
 
-    h_dp = calc_holonomic_with_obstacle_heuristic(ngoal, ox, oy, xyreso)  # cost of each node
+    h_dp = astar.calc_holonomic_with_obs_heuristic(ngoal, ox, oy, xyreso, 1.0)  # cost of each node
 
     openset, closed_set = dict(), dict()
     openset[calc_index(nstart, c)] = nstart
@@ -388,11 +388,6 @@ def calc_index(node, c):
         print("Error(calc_index):", ind)
 
     return ind
-
-
-def calc_holonomic_with_obstacle_heuristic(gnode, ox, oy, xyreso):
-    h_dp = grid_a_star.calc_dist_policy(gnode.x[-1], gnode.y[-1], ox, oy, xyreso, 1.0)
-    return h_dp
 
 
 def get_config(ox, oy, xyreso, yawreso):
