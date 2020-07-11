@@ -473,8 +473,8 @@ def main():
 
     gx = 0.0  # [m]
     gy = 0.0  # [m]
-    gyaw0 = np.deg2rad(90.0)
-    gyawt = np.deg2rad(90.0)
+    gyaw0 = np.deg2rad(120.0)
+    gyawt = np.deg2rad(120.0)
 
     ox, oy = [], []
 
