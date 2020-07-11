@@ -465,10 +465,10 @@ def main():
     for j in range(0, 5):
         ox.append(-10.0)
         oy.append(float(j))
-
-    for j in range(0, 5):
-        ox.append(10.0)
-        oy.append(float(j))
+    #
+    # for j in range(0, 5):
+    #     ox.append(10.0)
+    #     oy.append(float(j))
 
     # for i in range(-10, 4):
     #     ox.append(-4.0)
