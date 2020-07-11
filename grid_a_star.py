@@ -116,8 +116,8 @@ def calc_astar_path(sx, sy, gx, gy, ox, oy, reso, vr):
         cost, c_id = heapq.heappop(pq)
         current = open_set[c_id]
 
-        if current.x == ngoal.x and current.y == ngoal.y:
-            closed_set[c_id] = current
+        # if n_curr.x == ngoal.x and n_curr.y == ngoal.y:
+        #     closed_set[c_id] = n_curr
 
         open_set.pop(c_id)
         closed_set[c_id] = current
@@ -271,16 +271,19 @@ def main():
     for i in range(61):
         ox.append(0.0)
         oy.append(i)
-    for i in range(40):
+    for i in range(30):
         ox.append(20.0)
         oy.append(i)
+    for i in range(10, 20):
+        ox.append(i)
+        oy.append(30)
     for i in range(40):
         ox.append(40.0)
         oy.append(60.0 - i)
 
     rx, ry = calc_astar_path(sx, sy, gx, gy, ox, oy, GRID_RESOLUTION, VEHICLE_RADIUS)
 
-    plt.plot(ox, oy, "sk", label="obstacles")
+    plt.plot(ox, oy, "*k", label="obstacles")
     plt.plot(sx, sy, "xr", label="start")
     plt.plot(gx, gy, "xb", label="goal")
     plt.plot(rx, ry, "-r", label="A* path")
