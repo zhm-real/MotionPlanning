@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import scipy.spatial.kdtree as kd
 
 import astar
-import rs_path as rs
+import reeds_shepp_path as rs
 import lib
 
 
@@ -473,8 +473,8 @@ def main():
 
     gx = 0.0  # [m]
     gy = 0.0  # [m]
-    gyaw0 = np.deg2rad(120.0)
-    gyawt = np.deg2rad(120.0)
+    gyaw0 = np.deg2rad(60.0)
+    gyawt = np.deg2rad(60.0)
 
     ox, oy = [], []
 
