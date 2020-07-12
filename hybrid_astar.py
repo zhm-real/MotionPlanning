@@ -13,8 +13,7 @@ class C:  # Parameter config
     PI = math.pi
 
     XY_RESO = 2.0  # [m]
-    YAW_RESO = np.deg2rad(10.0)  # [rad]
-    GOAL_YAW_ERROR = np.deg2rad(5.0)  # [rad]
+    YAW_RESO = np.deg2rad(15.0)  # [rad]
     MOVE_STEP = 0.1  # [m] path interporate resolution
     N_STEER = 20.0  # steer command number
     COLLISION_CHECK_STEP = 8  # skip number for collision check
@@ -80,22 +79,17 @@ class Path:
 
 
 class QueuePrior:
-    """
-    Class: QueuePrior
-    Description: QueuePrior reorders elements using value [priority]
-    """
-
     def __init__(self):
         self.queue = []
 
     def empty(self):
-        return len(self.queue) == 0
+        return len(self.queue) == 0  # if Q is empty
 
     def put(self, item, priority):
         heapq.heappush(self.queue, (priority, item))  # reorder x using priority
 
     def get(self):
-        return heapq.heappop(self.queue)[1]  # pop out the smallest item
+        return heapq.heappop(self.queue)[1]  # pop out element with smallest priority
 
 
 def hybrid_astar_planning(sx, sy, syaw, gx, gy, gyaw, ox, oy, xyreso, yawreso):
@@ -110,7 +104,7 @@ def hybrid_astar_planning(sx, sy, syaw, gx, gy, gyaw, ox, oy, xyreso, yawreso):
     P = calc_parameters(ox, oy, xyreso, yawreso, kdtree)
 
     hmap = astar.calc_holonomic_heuristic_with_obstacle(ngoal, P.ox, P.oy, P.xyreso, 1.0)
-    steer, direc = calc_motion_set()
+    steer_set, direc_set = calc_motion_set()
 
     fnode = None
 
@@ -121,21 +115,21 @@ def hybrid_astar_planning(sx, sy, syaw, gx, gy, gyaw, ox, oy, xyreso, yawreso):
 
     while True:
         if not open_set:
-            return
+            return None
 
         ind = qp.get()
         n_curr = open_set[ind]
         closed_set[ind] = n_curr
         open_set.pop(ind)
 
-        update, fpath = update_node_with_analystic_expantion(n_curr, ngoal, gyaw, P)
+        update, fpath = update_node_with_analystic_expantion(n_curr, ngoal, P)
 
         if update:
             fnode = fpath
             break
 
-        for i in range(len(steer)):
-            node = calc_next_node(n_curr, ind, steer[i], direc[i], P)
+        for i in range(len(steer_set)):
+            node = calc_next_node(n_curr, ind, steer_set[i], direc_set[i], P)
 
             if not node:
                 continue
@@ -156,31 +150,29 @@ def hybrid_astar_planning(sx, sy, syaw, gx, gy, gyaw, ox, oy, xyreso, yawreso):
 
 
 def extract_path(closed, ngoal, nstart):
-    rx = list(reversed(ngoal.x))
-    ry = list(reversed(ngoal.y))
-    ryaw = list(reversed(ngoal.yaw))
-    direction = list(reversed(ngoal.directions))
-    nid = ngoal.pind
-    finalcost = ngoal.cost
+    rx, ry, ryaw, direc = [], [], [], []
+    cost = 0.0
+    node = ngoal
 
     while True:
-        n = closed[nid]
-        rx = rx + list(reversed(n.x))
-        ry = ry + list(reversed(n.y))
-        ryaw = ryaw + list(reversed(n.yaw))
-        direction = direction + list(reversed(n.directions))
-        nid = n.pind
+        rx += node.x[::-1]
+        ry += node.y[::-1]
+        ryaw += node.yaw[::-1]
+        direc += node.directions[::-1]
+        cost += node.cost
 
-        if is_same_grid(n, nstart):
+        if is_same_grid(node, nstart):
             break
 
-    rx = list(reversed(rx))
-    ry = list(reversed(ry))
-    ryaw = list(reversed(ryaw))
-    direction = list(reversed(direction))
+        node = closed[node.pind]
 
-    direction[0] = direction[1]
-    path = Path(rx, ry, ryaw, direction, finalcost)
+    rx = rx[::-1]
+    ry = ry[::-1]
+    ryaw = ryaw[::-1]
+    direc = direc[::-1]
+
+    direc[0] = direc[1]
+    path = Path(rx, ry, ryaw, direc, cost)
 
     return path
 
@@ -202,7 +194,7 @@ def calc_next_node(n_curr, c_id, u, d, P):
     yind = round(ylist[-1] / P.xyreso)
     yawind = round(yawlist[-1] / P.yawreso)
 
-    if not check_index(xind, yind, xlist, ylist, yawlist, P):
+    if not is_index_ok(xind, yind, xlist, ylist, yawlist, P):
         return None
 
     cost = 0.0
@@ -229,7 +221,7 @@ def calc_next_node(n_curr, c_id, u, d, P):
     return node
 
 
-def check_index(xind, yind, xlist, ylist, yawlist, P):
+def is_index_ok(xind, yind, xlist, ylist, yawlist, P):
     if xind <= P.minx or \
             xind >= P.maxx or \
             yind <= P.miny or \
@@ -242,13 +234,13 @@ def check_index(xind, yind, xlist, ylist, yawlist, P):
     nodey = [ylist[k] for k in ind]
     nodeyaw = [yawlist[k] for k in ind]
 
-    if not check_collision(nodex, nodey, nodeyaw, P):
+    if is_collision(nodex, nodey, nodeyaw, P):
         return False
 
     return True
 
 
-def update_node_with_analystic_expantion(n_curr, ngoal, gyaw, P):
+def update_node_with_analystic_expantion(n_curr, ngoal, P):
     path = analystic_expantion(n_curr, ngoal, P)  # rs path: n_curr -> ngoal
 
     if not path:
@@ -279,7 +271,7 @@ def analystic_expantion(node, ngoal, P):
     if not paths:
         return None
 
-    paths_collision_free = []
+    paths_collision_free = {}
     for path in paths:
         ind = range(0, len(path.x), C.COLLISION_CHECK_STEP)
 
@@ -287,21 +279,16 @@ def analystic_expantion(node, ngoal, P):
         pathy = [path.y[k] for k in ind]
         pathyaw = [path.yaw[k] for k in ind]
 
-        if check_collision(pathx, pathy, pathyaw, P):
-            paths_collision_free.append(path)
+        if not is_collision(pathx, pathy, pathyaw, P):
+            paths_collision_free[path] = calc_rs_path_cost(path)
 
-    if not paths_collision_free:
-        return None
+    if paths_collision_free:
+        return min(paths_collision_free, key=paths_collision_free.get)
 
-    pathcost = []
-    for path in paths_collision_free:
-        pathcost.append(calc_rs_path_cost(path))
-
-    return paths_collision_free[pathcost.index(min(pathcost))]
+    return None
 
 
-def check_collision(x, y, yaw, P):
-
+def is_collision(x, y, yaw, P):
     for ix, iy, iyaw in zip(x, y, yaw):
         ids = P.kdtree.query_ball_point([ix, iy], C.LF * 2)
 
@@ -317,9 +304,9 @@ def check_collision(x, y, yaw, P):
 
             if abs(dx) < C.W / 2 + C.EXTEND_BOUND and \
                     -C.LB - C.EXTEND_BOUND < dy < C.LF + C.EXTEND_BOUND:
-                return False
+                return True
 
-    return True
+    return False
 
 
 def calc_rs_path_cost(rspath):
@@ -390,18 +377,10 @@ def calc_index(node, P):
 
 
 def calc_parameters(ox, oy, xyreso, yawreso, kdtree):
-    minox, minoy = min(ox), min(oy)
-    maxox, maxoy = max(ox), max(oy)
-
-    ox.append(minox)
-    oy.append(minoy)
-    ox.append(maxox)
-    oy.append(maxoy)
-
-    minx = round(minox / xyreso)
-    miny = round(minoy / xyreso)
-    maxx = round(maxox / xyreso)
-    maxy = round(maxoy / xyreso)
+    minx = round(min(ox) / xyreso)
+    miny = round(min(oy) / xyreso)
+    maxx = round(max(ox) / xyreso)
+    maxy = round(max(oy) / xyreso)
 
     xw, yw = maxx - minx, maxy - miny
 
@@ -409,10 +388,8 @@ def calc_parameters(ox, oy, xyreso, yawreso, kdtree):
     maxyaw = round(C.PI / yawreso)
     yaww = maxyaw - minyaw
 
-    P = Para(minx, miny, minyaw, maxx, maxy, maxyaw,
-             xw, yw, yaww, xyreso, yawreso, ox, oy, kdtree)
-
-    return P
+    return Para(minx, miny, minyaw, maxx, maxy, maxyaw,
+                xw, yw, yaww, xyreso, yawreso, ox, oy, kdtree)
 
 
 def plot_car(x, y, yaw, steer):
@@ -484,7 +461,7 @@ def main():
     sx, sy = 5.0, 5.0
     syaw0 = np.deg2rad(90.0)
 
-    gx, gy = 45.0, 10.0
+    gx, gy = 45.0, 20.0
     gyaw0 = np.deg2rad(89.0)
 
     ox, oy = [], []
