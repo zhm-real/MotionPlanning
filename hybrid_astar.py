@@ -25,9 +25,10 @@ class C:  # Parameter config
     STEER_ANGLE_COST = 1.0  # steer angle penalty cost
     H_COST = 5.0  # Heuristic cost penalty cost
 
-    LF = 4.5  # [m] distance from rear to vehicle front end of vehicle
-    LB = 1.0  # [m] distance from rear to vehicle back end of vehicle
+    RF = 4.5  # [m] distance from rear to vehicle front end of vehicle
+    RB = 1.0  # [m] distance from rear to vehicle back end of vehicle
     W = 2.6  # [m] width of vehicle
+    WD = 3 / 4 * W
     WB = 3.7  # [m] Wheel base
     TR = 0.5  # Tyre radius [m] for plot
     TW = 1.0  # Tyre width [m] for plot
@@ -290,7 +291,7 @@ def analystic_expantion(node, ngoal, P):
 
 def is_collision(x, y, yaw, P):
     for ix, iy, iyaw in zip(x, y, yaw):
-        ids = P.kdtree.query_ball_point([ix, iy], C.LF * 2)
+        ids = P.kdtree.query_ball_point([ix, iy], C.RF * 2)
 
         if not ids:
             continue
@@ -303,7 +304,7 @@ def is_collision(x, y, yaw, P):
             dy = -xo * math.sin(theta) + yo * math.cos(theta)
 
             if abs(dx) < C.W / 2 + C.EXTEND_BOUND and \
-                    -C.LB - C.EXTEND_BOUND < dy < C.LF + C.EXTEND_BOUND:
+                    -C.RB - C.EXTEND_BOUND < dy < C.RF + C.EXTEND_BOUND:
                 return True
 
     return False
@@ -392,12 +393,33 @@ def calc_parameters(ox, oy, xyreso, yawreso, kdtree):
                 xw, yw, yaww, xyreso, yawreso, ox, oy, kdtree)
 
 
-def plot_car(x, y, yaw, steer):
-    truckcolor = "-k"
+def draw_car(x, y, yaw, steer, color='-k'):
+    carOutline = np.array([-C.W / 2, -C.W / 2, C.W / 2, C.W / 2],
+                          [C.RF, -C.RB, -C.RB, C.RF])
 
-    LENGTH = C.LB + C.LF
+    flWheel = np.array([-C.TW / 2, -C.TW / 2, C.TW / 2, C.TW / 2],
+                       [C.TR, -C.TR, -C.TR, C.TR])
 
-    truckOutLine = np.array([[-C.LB, (LENGTH - C.LB), (LENGTH - C.LB), (-C.LB), (-C.LB)],
+    flWheel[0, :] -= C.WD / 2
+    flWheel[1, :] += C.WB
+
+    frWheel = np.array([-C.TW / 2, -C.TW / 2, C.TW / 2, C.TW / 2],
+                       [C.TR, -C.TR, -C.TR, C.TR])
+
+    frWheel[0, :] += C.WD / 2
+    frWheel[1, :] += C.WB
+
+    rlWheel = np.array([-C.TW / 2, -C.TW / 2, C.TW / 2, C.TW / 2],
+                       [C.TR, -C.TR, -C.TR, C.TR])
+
+    rlWheel[0, :] -= C.WD / 2
+    rlWheel[1, :] += C.WB
+
+
+
+    LENGTH = C.RB + C.RF
+
+    truckOutLine = np.array([[-C.RB, (LENGTH - C.RB), (LENGTH - C.RB), (-C.RB), (-C.RB)],
                              [C.W / 2, C.W / 2, -C.W / 2, -C.W / 2, C.W / 2]])
 
     rr_wheel = np.array([[C.TR, -C.TR, -C.TR, C.TR, C.TR],
@@ -446,11 +468,11 @@ def plot_car(x, y, yaw, steer):
     rl_wheel[0, :] += x
     rl_wheel[1, :] += y
 
-    plt.plot(truckOutLine[0, :], truckOutLine[1, :], truckcolor)
-    plt.plot(fr_wheel[0, :], fr_wheel[1, :], truckcolor)
-    plt.plot(rr_wheel[0, :], rr_wheel[1, :], truckcolor)
-    plt.plot(fl_wheel[0, :], fl_wheel[1, :], truckcolor)
-    plt.plot(rl_wheel[0, :], rl_wheel[1, :], truckcolor)
+    plt.plot(truckOutLine[0, :], truckOutLine[1, :], color)
+    plt.plot(fr_wheel[0, :], fr_wheel[1, :], color)
+    plt.plot(rr_wheel[0, :], rr_wheel[1, :], color)
+    plt.plot(fl_wheel[0, :], fl_wheel[1, :], color)
+    plt.plot(rl_wheel[0, :], rl_wheel[1, :], color)
     plt.plot(x, y, "*")
 
 
@@ -502,8 +524,8 @@ def main():
         return
 
     plt.plot(ox, oy, ".k")
-    plot_car(sx, sy, syaw0, 0.0)
-    plot_car(gx, gy, gyaw0, 0.0)
+    draw_car(sx, sy, syaw0, 0.0)
+    draw_car(gx, gy, gyaw0, 0.0)
     x = path.x
     y = path.y
     yaw = path.yaw
@@ -522,8 +544,8 @@ def main():
             steer = math.atan2(C.WB * k, 1.0)
         else:
             steer = 0.0
-        plot_car(gx, gy, gyaw0, 0.0)
-        plot_car(x[ii], y[ii], yaw[ii], steer)
+        draw_car(gx, gy, gyaw0, 0.0)
+        draw_car(x[ii], y[ii], yaw[ii], steer)
         plt.axis("equal")
         plt.pause(0.0001)
 
