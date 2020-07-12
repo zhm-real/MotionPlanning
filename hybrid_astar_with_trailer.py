@@ -297,10 +297,10 @@ def verify_index(node, inityawt, P):
         return False
 
     # check collisiton
-    # steps = [C.Motion_RESO * x for x in node.directions]
+    # steps = [C.MOVE_STEP * x for x in node.directions]
     # yawt = lib.calc_trailer_yaw(node.yaw, inityawt, steps)
     #
-    # ind = range(0, len(node.x), C.SKIP_COLLISION_CHECK)
+    # ind = range(0, len(node.x), C.COLLISION_CHECK_STEP)
     #
     # nodex = [node.x[k] for k in ind]
     # nodey = [node.y[k] for k in ind]

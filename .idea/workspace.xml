@@ -4,6 +4,7 @@
     <list default="true" id="ae53ac00-9fa3-45c1-96b9-0e1ae7113cc3" name="Default Changelist" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/hybrid_astar.py" beforeDir="false" afterPath="$PROJECT_DIR$/hybrid_astar.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/hybrid_astar_with_trailer.py" beforeDir="false" afterPath="$PROJECT_DIR$/hybrid_astar_with_trailer.py" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
@@ -26,8 +27,13 @@
     <ConfirmationsSetting value="2" id="Add" />
   </component>
   <component name="PropertiesComponent">
-    <property name="last_opened_file_path" value="$PROJECT_DIR$/../path planning algorithms/Search-based Planning" />
+    <property name="last_opened_file_path" value="$PROJECT_DIR$" />
     <property name="restartRequiresConfirmation" value="false" />
+  </component>
+  <component name="RecentsManager">
+    <key name="CopyFile.RECENT_KEYS">
+      <recent name="C:\Users\Huiming Zhou\Desktop\Github-ZHM\HybridAstar" />
+    </key>
   </component>
   <component name="RunDashboard">
     <option name="ruleStates">
