@@ -2,9 +2,8 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="ae53ac00-9fa3-45c1-96b9-0e1ae7113cc3" name="Default Changelist" comment="">
-      <change afterPath="$PROJECT_DIR$/hybrid_astar.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/hybrid_astar_with_trailer.py" beforeDir="false" afterPath="$PROJECT_DIR$/hybrid_astar_with_trailer.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/hybrid_astar.py" beforeDir="false" afterPath="$PROJECT_DIR$/hybrid_astar.py" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
@@ -42,7 +41,7 @@
       </list>
     </option>
   </component>
-  <component name="RunManager" selected="Python.hybrid_astar_with_trailer">
+  <component name="RunManager" selected="Python.hybrid_astar">
     <configuration name="astar" type="PythonConfigurationType" factoryName="Python" temporary="true">
       <module name="HybridAstar" />
       <option name="INTERPRETER_OPTIONS" value="" />
@@ -64,7 +63,7 @@
       <option name="INPUT_FILE" value="" />
       <method v="2" />
     </configuration>
-    <configuration name="grid_a_star" type="PythonConfigurationType" factoryName="Python" temporary="true">
+    <configuration name="hybrid_astar" type="PythonConfigurationType" factoryName="Python" temporary="true">
       <module name="HybridAstar" />
       <option name="INTERPRETER_OPTIONS" value="" />
       <option name="PARENT_ENVS" value="true" />
@@ -76,7 +75,7 @@
       <option name="IS_MODULE_SDK" value="true" />
       <option name="ADD_CONTENT_ROOTS" value="true" />
       <option name="ADD_SOURCE_ROOTS" value="true" />
-      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/grid_a_star.py" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/hybrid_astar.py" />
       <option name="PARAMETERS" value="" />
       <option name="SHOW_COMMAND_LINE" value="false" />
       <option name="EMULATE_TERMINAL" value="false" />
@@ -150,11 +149,11 @@
     </configuration>
     <recent_temporary>
       <list>
+        <item itemvalue="Python.hybrid_astar" />
         <item itemvalue="Python.hybrid_astar_with_trailer" />
         <item itemvalue="Python.lib" />
         <item itemvalue="Python.trailer_hybrid_a_star" />
         <item itemvalue="Python.astar" />
-        <item itemvalue="Python.grid_a_star" />
       </list>
     </recent_temporary>
   </component>
