@@ -18,7 +18,7 @@ class C:  # Parameter config
     MOVE_STEP = 0.1  # [m] path interporate resolution
     N_STEER = 20.0  # steer command number
     COLLISION_CHECK_STEP = 8  # skip number for collision check
-    EXTEND_BOUND = 1
+    EXTEND_BOUND = 1  # collision check range extended
 
     GEAR_COST = 100.0  # switch back penalty cost
     BACKWARD_COST = 5.0  # backward penalty cost
@@ -29,10 +29,10 @@ class C:  # Parameter config
     RF = 4.5  # [m] distance from rear to vehicle front end of vehicle
     RB = 1.0  # [m] distance from rear to vehicle back end of vehicle
     W = 3.0  # [m] width of vehicle
-    WD = 0.7 * W
+    WD = 0.7 * W  # [m] distance between left-right wheels
     WB = 3.5  # [m] Wheel base
-    TR = 0.5  # Tyre radius [m] for plot
-    TW = 1  # Tyre width [m] for plot
+    TR = 0.5  # [m] Tyre radius
+    TW = 1  # [m] Tyre width
     MAX_STEER = 0.6  # [rad] maximum steering angle
 
 
@@ -393,19 +393,19 @@ def calc_parameters(ox, oy, xyreso, yawreso, kdtree):
 
 def draw_car(x, y, yaw, steer, color='black'):
     car = np.array([[-C.RB, -C.RB, C.RF, C.RF, -C.RB],
-                   [C.W / 2, -C.W / 2, -C.W / 2, C.W / 2, C.W / 2]])
+                    [C.W / 2, -C.W / 2, -C.W / 2, C.W / 2, C.W / 2]])
 
     rlWheel = np.array([[-C.TR, -C.TR, C.TR, C.TR, -C.TR],
-                       [C.TW / 4, -C.TW / 4, -C.TW / 4, C.TW / 4, C.TW / 4]])
+                        [C.TW / 4, -C.TW / 4, -C.TW / 4, C.TW / 4, C.TW / 4]])
 
     rrWheel = np.array([[-C.TR, -C.TR, C.TR, C.TR, -C.TR],
-                       [C.TW / 4, -C.TW / 4, -C.TW / 4, C.TW / 4, C.TW / 4]])
+                        [C.TW / 4, -C.TW / 4, -C.TW / 4, C.TW / 4, C.TW / 4]])
 
     frWheel = np.array([[-C.TR, -C.TR, C.TR, C.TR, -C.TR],
-                       [C.TW / 4, -C.TW / 4, -C.TW / 4, C.TW / 4, C.TW / 4]])
+                        [C.TW / 4, -C.TW / 4, -C.TW / 4, C.TW / 4, C.TW / 4]])
 
     flWheel = np.array([[-C.TR, -C.TR, C.TR, C.TR, -C.TR],
-                       [C.TW / 4, -C.TW / 4, -C.TW / 4, C.TW / 4, C.TW / 4]])
+                        [C.TW / 4, -C.TW / 4, -C.TW / 4, C.TW / 4, C.TW / 4]])
 
     Rot1 = np.array([[math.cos(yaw), -math.sin(yaw)],
                      [math.sin(yaw), math.cos(yaw)]])
@@ -481,14 +481,11 @@ def design_obstacles(x, y):
 
 
 def main():
+
     print("start!")
     x, y = 51, 31
-
-    sx, sy = 10.0, 7.0
-    syaw0 = np.deg2rad(120.0)
-
-    gx, gy = 45.0, 5.0
-    gyaw0 = np.deg2rad(90.0)
+    sx, sy, syaw0 = 10.0, 7.0, np.deg2rad(120.0)
+    gx, gy, gyaw0 = 45.0, 20.0, np.deg2rad(90.0)
 
     ox, oy = design_obstacles(x, y)
 
@@ -527,9 +524,8 @@ def main():
         plt.axis("equal")
         plt.pause(0.0001)
 
-    print("Done!")
-    plt.axis("equal")
     plt.show()
+    print("Done!")
 
 
 if __name__ == '__main__':

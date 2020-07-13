@@ -2,9 +2,7 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="ae53ac00-9fa3-45c1-96b9-0e1ae7113cc3" name="Default Changelist" comment="">
-      <change afterPath="$PROJECT_DIR$/test.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/draw.py" beforeDir="false" afterPath="$PROJECT_DIR$/draw.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/hybrid_astar.py" beforeDir="false" afterPath="$PROJECT_DIR$/hybrid_astar.py" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
