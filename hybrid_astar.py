@@ -185,9 +185,9 @@ def calc_next_node(n_curr, c_id, u, d, P):
     yawlist = [rs.pi_2_pi(n_curr.yaw[-1] + d * C.MOVE_STEP / C.WB * math.tan(u))]
 
     for i in range(nlist - 1):
-        xlist.append(xlist[-1] + d * C.MOVE_STEP * math.cos(yawlist[-1]))
-        ylist.append(ylist[-1] + d * C.MOVE_STEP * math.sin(yawlist[-1]))
-        yawlist.append(rs.pi_2_pi(yawlist[-1] + d * C.MOVE_STEP / C.WB * math.tan(u)))
+        xlist.append(xlist[i] + d * C.MOVE_STEP * math.cos(yawlist[i]))
+        ylist.append(ylist[i] + d * C.MOVE_STEP * math.sin(yawlist[i]))
+        yawlist.append(rs.pi_2_pi(yawlist[i] + d * C.MOVE_STEP / C.WB * math.tan(u)))
 
     xind = round(xlist[-1] / P.xyreso)
     yind = round(ylist[-1] / P.xyreso)
@@ -240,7 +240,7 @@ def is_index_ok(xind, yind, xlist, ylist, yawlist, P):
 
 
 def update_node_with_analystic_expantion(n_curr, ngoal, P):
-    path = analystic_expantion(n_curr, ngoal, P)  # rs path: n_curr -> ngoal
+    path = analystic_expantion(n_curr, ngoal, P)  # rs path: n -> ngoal
 
     if not path:
         return False, None
@@ -270,8 +270,12 @@ def analystic_expantion(node, ngoal, P):
     if not paths:
         return None
 
-    paths_collision_free = {}
+    pq = QueuePrior()
     for path in paths:
+        pq.put(path, calc_rs_path_cost(path))
+
+    while not pq.empty():
+        path = pq.get()
         ind = range(0, len(path.x), C.COLLISION_CHECK_STEP)
 
         pathx = [path.x[k] for k in ind]
@@ -279,10 +283,7 @@ def analystic_expantion(node, ngoal, P):
         pathyaw = [path.yaw[k] for k in ind]
 
         if not is_collision(pathx, pathy, pathyaw, P):
-            paths_collision_free[path] = calc_rs_path_cost(path)
-
-    if paths_collision_free:
-        return min(paths_collision_free, key=paths_collision_free.get)
+            return path
 
     return None
 
@@ -395,17 +396,13 @@ def draw_car(x, y, yaw, steer, color='black'):
     car = np.array([[-C.RB, -C.RB, C.RF, C.RF, -C.RB],
                     [C.W / 2, -C.W / 2, -C.W / 2, C.W / 2, C.W / 2]])
 
-    rlWheel = np.array([[-C.TR, -C.TR, C.TR, C.TR, -C.TR],
-                        [C.TW / 4, -C.TW / 4, -C.TW / 4, C.TW / 4, C.TW / 4]])
+    wheel = np.array([[-C.TR, -C.TR, C.TR, C.TR, -C.TR],
+                      [C.TW / 4, -C.TW / 4, -C.TW / 4, C.TW / 4, C.TW / 4]])
 
-    rrWheel = np.array([[-C.TR, -C.TR, C.TR, C.TR, -C.TR],
-                        [C.TW / 4, -C.TW / 4, -C.TW / 4, C.TW / 4, C.TW / 4]])
-
-    frWheel = np.array([[-C.TR, -C.TR, C.TR, C.TR, -C.TR],
-                        [C.TW / 4, -C.TW / 4, -C.TW / 4, C.TW / 4, C.TW / 4]])
-
-    flWheel = np.array([[-C.TR, -C.TR, C.TR, C.TR, -C.TR],
-                        [C.TW / 4, -C.TW / 4, -C.TW / 4, C.TW / 4, C.TW / 4]])
+    rlWheel = wheel.copy()
+    rrWheel = wheel.copy()
+    frWheel = wheel.copy()
+    flWheel = wheel.copy()
 
     Rot1 = np.array([[math.cos(yaw), -math.sin(yaw)],
                      [math.sin(yaw), math.cos(yaw)]])
@@ -416,10 +413,8 @@ def draw_car(x, y, yaw, steer, color='black'):
     frWheel = np.dot(Rot2, frWheel)
     flWheel = np.dot(Rot2, flWheel)
 
-    frWheel[0, :] += C.WB
-    flWheel[0, :] += C.WB
-    frWheel[1, :] -= C.WD / 2
-    flWheel[1, :] += C.WD / 2
+    frWheel += np.array([[C.WB], [-C.WD / 2]])
+    flWheel += np.array([[C.WB], [C.WD / 2]])
     rrWheel[1, :] -= C.WD / 2
     rlWheel[1, :] += C.WD / 2
 
@@ -430,16 +425,11 @@ def draw_car(x, y, yaw, steer, color='black'):
     rlWheel = np.dot(Rot1, rlWheel)
     car = np.dot(Rot1, car)
 
-    frWheel[0, :] += x
-    flWheel[0, :] += x
-    frWheel[1, :] += y
-    flWheel[1, :] += y
-    rrWheel[0, :] += x
-    rlWheel[0, :] += x
-    rrWheel[1, :] += y
-    rlWheel[1, :] += y
-    car[0, :] += x
-    car[1, :] += y
+    frWheel += np.array([[x], [y]])
+    flWheel += np.array([[x], [y]])
+    rrWheel += np.array([[x], [y]])
+    rlWheel += np.array([[x], [y]])
+    car += np.array([[x], [y]])
 
     plt.plot(car[0, :], car[1, :], color)
     plt.plot(frWheel[0, :], frWheel[1, :], color)
@@ -481,7 +471,6 @@ def design_obstacles(x, y):
 
 
 def main():
-
     print("start!")
     x, y = 51, 31
     sx, sy, syaw0 = 10.0, 7.0, np.deg2rad(120.0)
