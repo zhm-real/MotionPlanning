@@ -7,6 +7,7 @@ import scipy.spatial.kdtree as kd
 
 import astar
 import reeds_shepp_path as rs
+import draw
 
 
 class C:  # Parameter config
@@ -19,19 +20,19 @@ class C:  # Parameter config
     COLLISION_CHECK_STEP = 8  # skip number for collision check
     EXTEND_BOUND = 1
 
-    GEAR_COST = 20.0  # switch back penalty cost
+    GEAR_COST = 100.0  # switch back penalty cost
     BACKWARD_COST = 5.0  # backward penalty cost
     STEER_CHANGE_COST = 5.0  # steer angle change penalty cost
     STEER_ANGLE_COST = 1.0  # steer angle penalty cost
-    H_COST = 5.0  # Heuristic cost penalty cost
+    H_COST = 15.0  # Heuristic cost penalty cost
 
     RF = 4.5  # [m] distance from rear to vehicle front end of vehicle
     RB = 1.0  # [m] distance from rear to vehicle back end of vehicle
-    W = 2.6  # [m] width of vehicle
-    WD = 3 / 4 * W
-    WB = 3.7  # [m] Wheel base
+    W = 3.0  # [m] width of vehicle
+    WD = 0.7 * W
+    WB = 3.5  # [m] Wheel base
     TR = 0.5  # Tyre radius [m] for plot
-    TW = 1.0  # Tyre width [m] for plot
+    TW = 1  # Tyre width [m] for plot
     MAX_STEER = 0.6  # [rad] maximum steering angle
 
 
@@ -106,9 +107,6 @@ def hybrid_astar_planning(sx, sy, syaw, gx, gy, gyaw, ox, oy, xyreso, yawreso):
 
     hmap = astar.calc_holonomic_heuristic_with_obstacle(ngoal, P.ox, P.oy, P.xyreso, 1.0)
     steer_set, direc_set = calc_motion_set()
-
-    fnode = None
-
     open_set, closed_set = {calc_index(nstart, P): nstart}, {}
 
     qp = QueuePrior()
@@ -201,10 +199,10 @@ def calc_next_node(n_curr, c_id, u, d, P):
     cost = 0.0
 
     if d > 0:
-        direction = True
+        direction = 1
         cost += abs(step)
     else:
-        direction = False
+        direction = -1
         cost += abs(step) * C.BACKWARD_COST
 
     if direction != n_curr.direction:  # switch back penalty
@@ -393,99 +391,65 @@ def calc_parameters(ox, oy, xyreso, yawreso, kdtree):
                 xw, yw, yaww, xyreso, yawreso, ox, oy, kdtree)
 
 
-def draw_car(x, y, yaw, steer, color='-k'):
-    carOutline = np.array([-C.W / 2, -C.W / 2, C.W / 2, C.W / 2],
-                          [C.RF, -C.RB, -C.RB, C.RF])
+def draw_car(x, y, yaw, steer, color='black'):
+    car = np.array([[-C.RB, -C.RB, C.RF, C.RF, -C.RB],
+                   [C.W / 2, -C.W / 2, -C.W / 2, C.W / 2, C.W / 2]])
 
-    flWheel = np.array([-C.TW / 2, -C.TW / 2, C.TW / 2, C.TW / 2],
-                       [C.TR, -C.TR, -C.TR, C.TR])
+    rlWheel = np.array([[-C.TR, -C.TR, C.TR, C.TR, -C.TR],
+                       [C.TW / 4, -C.TW / 4, -C.TW / 4, C.TW / 4, C.TW / 4]])
 
-    flWheel[0, :] -= C.WD / 2
-    flWheel[1, :] += C.WB
+    rrWheel = np.array([[-C.TR, -C.TR, C.TR, C.TR, -C.TR],
+                       [C.TW / 4, -C.TW / 4, -C.TW / 4, C.TW / 4, C.TW / 4]])
 
-    frWheel = np.array([-C.TW / 2, -C.TW / 2, C.TW / 2, C.TW / 2],
-                       [C.TR, -C.TR, -C.TR, C.TR])
+    frWheel = np.array([[-C.TR, -C.TR, C.TR, C.TR, -C.TR],
+                       [C.TW / 4, -C.TW / 4, -C.TW / 4, C.TW / 4, C.TW / 4]])
 
-    frWheel[0, :] += C.WD / 2
-    frWheel[1, :] += C.WB
+    flWheel = np.array([[-C.TR, -C.TR, C.TR, C.TR, -C.TR],
+                       [C.TW / 4, -C.TW / 4, -C.TW / 4, C.TW / 4, C.TW / 4]])
 
-    rlWheel = np.array([-C.TW / 2, -C.TW / 2, C.TW / 2, C.TW / 2],
-                       [C.TR, -C.TR, -C.TR, C.TR])
+    Rot1 = np.array([[math.cos(yaw), -math.sin(yaw)],
+                     [math.sin(yaw), math.cos(yaw)]])
 
-    rlWheel[0, :] -= C.WD / 2
-    rlWheel[1, :] += C.WB
+    Rot2 = np.array([[math.cos(steer), math.sin(steer)],
+                     [-math.sin(steer), math.cos(steer)]])
 
+    frWheel = np.dot(Rot2, frWheel)
+    flWheel = np.dot(Rot2, flWheel)
 
+    frWheel[0, :] += C.WB
+    flWheel[0, :] += C.WB
+    frWheel[1, :] -= C.WD / 2
+    flWheel[1, :] += C.WD / 2
+    rrWheel[1, :] -= C.WD / 2
+    rlWheel[1, :] += C.WD / 2
 
-    LENGTH = C.RB + C.RF
+    frWheel = np.dot(Rot1, frWheel)
+    flWheel = np.dot(Rot1, flWheel)
 
-    truckOutLine = np.array([[-C.RB, (LENGTH - C.RB), (LENGTH - C.RB), (-C.RB), (-C.RB)],
-                             [C.W / 2, C.W / 2, -C.W / 2, -C.W / 2, C.W / 2]])
+    rrWheel = np.dot(Rot1, rrWheel)
+    rlWheel = np.dot(Rot1, rlWheel)
+    car = np.dot(Rot1, car)
 
-    rr_wheel = np.array([[C.TR, -C.TR, -C.TR, C.TR, C.TR],
-                         [-C.W / 12.0 + C.TW, -C.W / 12.0 + C.TW, C.W / 12.0 + C.TW,
-                          C.W / 12.0 + C.TW, -C.W / 12.0 + C.TW]])
+    frWheel[0, :] += x
+    flWheel[0, :] += x
+    frWheel[1, :] += y
+    flWheel[1, :] += y
+    rrWheel[0, :] += x
+    rlWheel[0, :] += x
+    rrWheel[1, :] += y
+    rlWheel[1, :] += y
+    car[0, :] += x
+    car[1, :] += y
 
-    rl_wheel = np.array([[C.TR, -C.TR, -C.TR, C.TR, C.TR],
-                         [-C.W / 12.0 - C.TW, -C.W / 12.0 - C.TW, C.W / 12.0 - C.TW,
-                          C.W / 12.0 - C.TW, -C.W / 12.0 - C.TW]])
-
-    fr_wheel = np.array([[C.TR, -C.TR, -C.TR, C.TR, C.TR],
-                         [-C.W / 12.0 + C.TW, -C.W / 12.0 + C.TW, C.W / 12.0 + C.TW,
-                          C.W / 12.0 + C.TW, -C.W / 12.0 + C.TW]])
-
-    fl_wheel = np.array([[C.TR, -C.TR, -C.TR, C.TR, C.TR],
-                         [-C.W / 12.0 - C.TW, -C.W / 12.0 - C.TW, C.W / 12.0 - C.TW,
-                          C.W / 12.0 - C.TW, -C.W / 12.0 - C.TW]])
-
-    Rot1 = np.array([[math.cos(yaw), math.sin(yaw)],
-                     [-math.sin(yaw), math.cos(yaw)]])
-
-    Rot2 = np.array([[math.cos(-steer), math.sin(-steer)],
-                     [-math.sin(-steer), math.cos(-steer)]])
-
-    fr_wheel = (np.dot(fr_wheel.T, Rot2)).T
-    fl_wheel = (np.dot(fl_wheel.T, Rot2)).T
-
-    fr_wheel[0, :] = fr_wheel[0, :] + C.WB
-    fl_wheel[0, :] = fl_wheel[0, :] + C.WB
-
-    fr_wheel = (np.dot(fr_wheel.T, Rot1)).T
-    fl_wheel = (np.dot(fl_wheel.T, Rot1)).T
-
-    truckOutLine = (np.dot(truckOutLine.T, Rot1)).T
-    rr_wheel = (np.dot(rr_wheel.T, Rot1)).T
-    rl_wheel = (np.dot(rl_wheel.T, Rot1)).T
-
-    truckOutLine[0, :] += x
-    truckOutLine[1, :] += y
-    fr_wheel[0, :] += x
-    fr_wheel[1, :] += y
-    rr_wheel[0, :] += x
-    rr_wheel[1, :] += y
-    fl_wheel[0, :] += x
-    fl_wheel[1, :] += y
-    rl_wheel[0, :] += x
-    rl_wheel[1, :] += y
-
-    plt.plot(truckOutLine[0, :], truckOutLine[1, :], color)
-    plt.plot(fr_wheel[0, :], fr_wheel[1, :], color)
-    plt.plot(rr_wheel[0, :], rr_wheel[1, :], color)
-    plt.plot(fl_wheel[0, :], fl_wheel[1, :], color)
-    plt.plot(rl_wheel[0, :], rl_wheel[1, :], color)
-    plt.plot(x, y, "*")
+    plt.plot(car[0, :], car[1, :], color)
+    plt.plot(frWheel[0, :], frWheel[1, :], color)
+    plt.plot(rrWheel[0, :], rrWheel[1, :], color)
+    plt.plot(flWheel[0, :], flWheel[1, :], color)
+    plt.plot(rlWheel[0, :], rlWheel[1, :], color)
+    draw.Arrow(x, y, yaw, C.WB * 0.8, color)
 
 
-def main():
-    print("start!")
-    x, y = 51, 31
-
-    sx, sy = 5.0, 5.0
-    syaw0 = np.deg2rad(90.0)
-
-    gx, gy = 45.0, 20.0
-    gyaw0 = np.deg2rad(89.0)
-
+def design_obstacles(x, y):
     ox, oy = [], []
 
     for i in range(x):
@@ -513,6 +477,21 @@ def main():
         ox.append(40)
         oy.append(i)
 
+    return ox, oy
+
+
+def main():
+    print("start!")
+    x, y = 51, 31
+
+    sx, sy = 10.0, 7.0
+    syaw0 = np.deg2rad(120.0)
+
+    gx, gy = 45.0, 5.0
+    gyaw0 = np.deg2rad(90.0)
+
+    ox, oy = design_obstacles(x, y)
+
     t0 = time.time()
     path = hybrid_astar_planning(sx, sy, syaw0, gx, gy, gyaw0,
                                  ox, oy, C.XY_RESO, C.YAW_RESO)
@@ -523,29 +502,28 @@ def main():
         print("Searching failed!")
         return
 
-    plt.plot(ox, oy, ".k")
-    draw_car(sx, sy, syaw0, 0.0)
-    draw_car(gx, gy, gyaw0, 0.0)
     x = path.x
     y = path.y
     yaw = path.yaw
     direction = path.direction
 
-    steer = 0.0
-    for ii in range(len(x)):
+    plt.plot(ox, oy, "sk")
+    plt.pause(2)
+
+    for k in range(len(x)):
         plt.cla()
         plt.plot(ox, oy, "sk")
-        plt.plot(x, y, "-r", label="Hybrid A* path")
+        plt.plot(x, y, linewidth=1.5, color='r')
 
-        if ii < len(x) - 2:
-            k = (yaw[ii + 1] - yaw[ii]) / C.MOVE_STEP
-            if ~direction[ii]:
-                k *= -1
-            steer = math.atan2(C.WB * k, 1.0)
+        if k < len(x) - 2:
+            dy = (yaw[k + 1] - yaw[k]) / C.MOVE_STEP
+            steer = rs.pi_2_pi(math.atan(-C.WB * dy / direction[k]))
         else:
             steer = 0.0
-        draw_car(gx, gy, gyaw0, 0.0)
-        draw_car(x[ii], y[ii], yaw[ii], steer)
+
+        draw_car(gx, gy, gyaw0, 0.0, 'dimgray')
+        draw_car(x[k], y[k], yaw[k], steer)
+        plt.title("Hybrid A*")
         plt.axis("equal")
         plt.pause(0.0001)
 

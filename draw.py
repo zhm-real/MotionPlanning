@@ -6,7 +6,7 @@ PI = np.pi
 class Arrow:
     def __init__(self, x, y, theta, L, c):
         angle = np.deg2rad(30)
-        d = 0.5 * L
+        d = 0.3 * L
         w = 2
 
         x_start = x
