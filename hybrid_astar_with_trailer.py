@@ -600,25 +600,25 @@ def design_obstacles():
 
     for i in range(-30, 31):
         ox.append(i)
-        oy.append(21)
+        oy.append(38)
 
-    for i in range(-30, -12):
+    for i in range(-30, -6):
         ox.append(i)
-        oy.append(7)
+        oy.append(23)
 
-    for i in range(13, 31):
+    for i in range(7, 31):
         ox.append(i)
-        oy.append(7)
+        oy.append(23)
 
-    for j in range(0, 8):
-        ox.append(12)
+    for j in range(0, 24):
+        ox.append(-6)
         oy.append(j)
 
-    for j in range(0, 8):
-        ox.append(-12)
+    for j in range(0, 24):
+        ox.append(6)
         oy.append(j)
 
-    for i in range(-12, 13):
+    for i in range(-6, 7):
         ox.append(i)
         oy.append(0)
 
@@ -686,13 +686,13 @@ def test(x, y, yaw, yawt, ox, oy):
 def main():
     print("start!")
 
-    sx, sy = 18.0, 17.0  # [m]
+    sx, sy = 18.0, 34.0  # [m]
     syaw0 = np.deg2rad(180.0)
     syawt = np.deg2rad(180.0)
 
-    gx, gy = 2.0, 4.0  # [m]
-    gyaw0 = np.deg2rad(00.0)
-    gyawt = np.deg2rad(00.0)
+    gx, gy = 0.0, 12.0  # [m]
+    gyaw0 = np.deg2rad(90.0)
+    gyawt = np.deg2rad(90.0)
 
     ox, oy = design_obstacles()
     plt.plot(ox, oy, 'sk')
