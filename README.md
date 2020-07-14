@@ -1,6 +1,6 @@
 # HybridAstar
 ## Overview
-Hybrid A* algorithm can generate smooth paths for an autonomous vehicle operating in an unknown environment, where obstacles are detected online by the robot’s sensors. This algorithm was proposed by Stanford and was experimentally validated in 2007 DARPA Urban Challenge.
+This is a python version of Hybrid A* algorithm, which can generate smooth paths for an autonomous vehicle operating in an unknown environment with obstacles. This algorithm was proposed by Stanford and was experimentally validated in 2007 DARPA Urban Challenge.
 
 ## Requirement
 * Python3
