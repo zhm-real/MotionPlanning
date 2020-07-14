@@ -21,7 +21,7 @@ This repository uses two models: simple car model and [car pulling trailers mode
 <table>
   <tr>
     <td><img src="https://github.com/zhm-real/HybridAstar/blob/master/gif/hybrid%20Astar-t1.gif" alt="11" width="400"/></a></td>
-    <td><img src="https://github.com/zhm-real/HybridAstar/blob/master/gif/hybrid%20Astar-t1.gif" alt="12" width="400"/></a></td>
+    <td><img src="https://github.com/zhm-real/HybridAstar/blob/master/gif/hybrid%20Astar-t5.gif" alt="12" width="400"/></a></td>
   </tr>
 </table>
 <table>
