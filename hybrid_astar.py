@@ -15,9 +15,9 @@ class C:  # Parameter config
 
     XY_RESO = 2.0  # [m]
     YAW_RESO = np.deg2rad(15.0)  # [rad]
-    MOVE_STEP = 0.1  # [m] path interporate resolution
+    MOVE_STEP = 0.4  # [m] path interporate resolution
     N_STEER = 20.0  # steer command number
-    COLLISION_CHECK_STEP = 8  # skip number for collision check
+    COLLISION_CHECK_STEP = 5  # skip number for collision check
     EXTEND_BOUND = 1  # collision check range extended
 
     GEAR_COST = 100.0  # switch back penalty cost
@@ -97,7 +97,8 @@ class QueuePrior:
 def hybrid_astar_planning(sx, sy, syaw, gx, gy, gyaw, ox, oy, xyreso, yawreso):
     sxr, syr = round(sx / xyreso), round(sy / xyreso)
     gxr, gyr = round(gx / xyreso), round(gy / xyreso)
-    syawr, gyawr = round(syaw / yawreso), round(gyaw / yawreso)
+    syawr = round(rs.pi_2_pi(syaw) / yawreso)
+    gyawr = round(rs.pi_2_pi(gyaw) / yawreso)
 
     nstart = Node(sxr, syr, syawr, 1, [sx], [sy], [syaw], [1], 0.0, 0.0, -1)
     ngoal = Node(gxr, gyr, gyawr, 1, [gx], [gy], [gyaw], [1], 0.0, 0.0, -1)
@@ -290,20 +291,25 @@ def analystic_expantion(node, ngoal, P):
 
 def is_collision(x, y, yaw, P):
     for ix, iy, iyaw in zip(x, y, yaw):
-        ids = P.kdtree.query_ball_point([ix, iy], C.RF * 2)
+        d = 1
+        dl = (C.RF - C.RB) / 2.0
+        r = (C.RF + C.RB) / 2.0 + d
+
+        cx = ix + dl * math.cos(iyaw)
+        cy = iy + dl * math.sin(iyaw)
+
+        ids = P.kdtree.query_ball_point([cx, cy], r)
 
         if not ids:
             continue
 
         for i in ids:
-            xo = P.ox[i] - ix
-            yo = P.oy[i] - iy
-            theta = iyaw - math.pi / 2
-            dx = xo * math.cos(theta) + yo * math.sin(theta)
-            dy = -xo * math.sin(theta) + yo * math.cos(theta)
+            xo = P.ox[i] - cx
+            yo = P.oy[i] - cy
+            dx = xo * math.cos(iyaw) + yo * math.sin(iyaw)
+            dy = -xo * math.sin(iyaw) + yo * math.cos(iyaw)
 
-            if abs(dx) < C.W / 2 + C.EXTEND_BOUND and \
-                    -C.RB - C.EXTEND_BOUND < dy < C.RF + C.EXTEND_BOUND:
+            if abs(dx) < r and abs(dy) < C.W / 2 + d:
                 return True
 
     return False

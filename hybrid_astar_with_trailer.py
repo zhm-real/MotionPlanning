@@ -15,17 +15,18 @@ class C:  # Parameter config
 
     XY_RESO = 2.0  # [m]
     YAW_RESO = np.deg2rad(15.0)  # [rad]
-    GOAL_YAW_ERROR = np.deg2rad(2.0)  # [rad]
-    MOVE_STEP = 0.1  # [m] path interporate resolution
+    GOAL_YAW_ERROR = np.deg2rad(3.0)  # [rad]
+    MOVE_STEP = 0.2  # [m] path interporate resolution
     N_STEER = 20.0  # number of steer command
-    COLLISION_CHECK_STEP = 20  # skip number for collision check
+    COLLISION_CHECK_STEP = 10  # skip number for collision check
+    EXTEND_AREA = 5.0  # [m] map extend length
 
     GEAR_COST = 100.0  # switch back penalty cost
     BACKWARD_COST = 5.0  # backward penalty cost
     STEER_CHANGE_COST = 5.0  # steer angle change penalty cost
     STEER_ANGLE_COST = 1.0  # steer angle penalty cost
     SCISSORS_COST = 200.0  # scissors cost
-    H_COST = 15.0  # Heuristic cost
+    H_COST = 10.0  # Heuristic cost
 
     W = 3.0  # [m] width of vehicle
     WB = 3.5  # [m] wheel base: rear to front steer
@@ -39,7 +40,7 @@ class C:  # Parameter config
     TR = 0.5  # [m] tyre radius
     TW = 1.0  # [m] tyre width
     MAX_STEER = 0.6  # [rad] maximum steering angle
-    EXTEND_BOUND = 0.1  # collision check range extended
+    EXTEND_BOUND = 0.5  # collision check range extended
 
 
 class Node:
@@ -126,7 +127,8 @@ def hybrid_astar_planning(sx, sy, syaw, syawt, gx, gy,
 
     sxr, syr = round(sx / xyreso), round(sy / xyreso)
     gxr, gyr = round(gx / xyreso), round(gy / xyreso)
-    syawr, gyawr = round(syaw / yawreso), round(gyaw / yawreso)
+    syawr = round(rs.pi_2_pi(syaw) / yawreso)
+    gyawr = round(rs.pi_2_pi(gyaw) / yawreso)
 
     nstart = Node(sxr, syr, syawr, 1, [sx], [sy], [syaw], [syawt], [1], 0.0, 0.0, -1)
     ngoal = Node(gxr, gyr, gyawr, 1, [gx], [gy], [gyaw], [gyawt], [1], 0.0, 0.0, -1)
@@ -226,7 +228,14 @@ def update_node_with_analystic_expantion(n_curr, ngoal, gyawt, P):
     fx = path.x[1:-1]
     fy = path.y[1:-1]
     fyaw = path.yaw[1:-1]
-    fd = path.directions[1:-1]
+
+    fd = []
+    for d in path.directions[1:-1]:
+        if d >= 0:
+            fd.append(1.0)
+        else:
+            fd.append(-1.0)
+    # fd = path.directions[1:-1]
 
     fcost = n_curr.cost + calc_rs_path_cost(path, yawt)
     fpind = calc_index(n_curr, P)
@@ -250,16 +259,15 @@ def analystic_expantion(node, ngoal, P):
         return None
 
     pq = QueuePrior()
-    yawt_rec = {}
     for path in paths:
         steps = [C.MOVE_STEP * d for d in path.directions]
         yawt = calc_trailer_yaw(path.yaw, node.yawt[-1], steps)
         pq.put(path, calc_rs_path_cost(path, yawt))
-        yawt_rec[path] = yawt
 
     while not pq.empty():
         path = pq.get()
-        yawt = yawt_rec[path]
+        steps = [C.MOVE_STEP * d for d in path.directions]
+        yawt = calc_trailer_yaw(path.yaw, node.yawt[-1], steps)
         ind = range(0, len(path.x), C.COLLISION_CHECK_STEP)
 
         pathx = [path.x[k] for k in ind]
@@ -297,10 +305,10 @@ def calc_next_node(n, ind, u, d, P):
     cost = 0.0
 
     if d > 0:
-        direction = 1
+        direction = 1.0
         cost += abs(step)
     else:
-        direction = -1
+        direction = -1.0
         cost += abs(step) * C.BACKWARD_COST
 
     if direction != n.direction:  # switch back penalty
@@ -322,38 +330,65 @@ def calc_next_node(n, ind, u, d, P):
 
 def is_collision(x, y, yaw, yawt, P):
     for ix, iy, iyaw, iyawt in zip(x, y, yaw, yawt):
-        ids = P.kdtree.query_ball_point([ix, iy], C.RTB)
+        d = 0.5
+        deltal = (C.RTF - C.RTB) / 2.0
+        rt = (C.RTF + C.RTB) / 2.0 + d
 
-        if not ids:
-            continue
+        ctx = ix + deltal * math.cos(iyawt)
+        cty = iy + deltal * math.sin(iyawt)
 
-        for i in ids:
-            xo = P.ox[i] - ix
-            yo = P.oy[i] - iy
+        idst = P.kdtree.query_ball_point([ctx, cty], rt)
 
-            dx_car = xo * math.cos(-iyaw) + yo * math.sin(-iyaw)
-            dy_car = -xo * math.sin(-iyaw) + yo * math.cos(-iyaw)
+        if idst:
+            for i in idst:
+                xot = P.ox[i] - ctx
+                yot = P.oy[i] - cty
 
-            if -C.RB - C.EXTEND_BOUND < dx_car < C.RF + C.EXTEND_BOUND and \
-                    abs(dy_car) < C.W / 2 + C.EXTEND_BOUND:
-                return True
+                dx_trail = xot * math.cos(iyawt) + yot * math.sin(iyawt)
+                dy_trail = -xot * math.sin(iyawt) + yot * math.cos(iyawt)
 
-            dx_car = xo * math.cos(-iyawt) + yo * math.sin(-iyawt)
-            dy_car = -xo * math.sin(-iyawt) + yo * math.cos(-iyawt)
+                if abs(dx_trail) <= rt and \
+                        abs(dy_trail) <= C.W / 2.0 + d:
+                    return True
 
-            if -C.RTB - C.EXTEND_BOUND < dx_car < C.RTF + C.EXTEND_BOUND and \
-                    abs(dy_car) < C.W / 2 + C.EXTEND_BOUND:
-                return True
+        deltal = (C.RF - C.RB) / 2.0
+        rc = (C.RF + C.RB) / 2.0 + d
+
+        cx = ix + deltal * math.cos(iyaw)
+        cy = iy + deltal * math.sin(iyaw)
+
+        ids = P.kdtree.query_ball_point([cx, cy], rc)
+
+        if ids:
+            for i in ids:
+                xo = P.ox[i] - cx
+                yo = P.oy[i] - cy
+
+                dx_car = xo * math.cos(iyaw) + yo * math.sin(iyaw)
+                dy_car = -xo * math.sin(iyaw) + yo * math.cos(iyaw)
+
+                if abs(dx_car) <= rc and \
+                        abs(dy_car) <= C.W / 2.0 + d:
+                    return True
+        #
+        # theta = np.linspace(0, 2 * np.pi, 200)
+        # x1 = ctx + np.cos(theta) * rt
+        # y1 = cty + np.sin(theta) * rt
+        # x2 = cx + np.cos(theta) * rc
+        # y2 = cy + np.sin(theta) * rc
+        #
+        # plt.plot(x1, y1, 'b')
+        # plt.plot(x2, y2, 'g')
 
     return False
 
 
 def calc_trailer_yaw(yaw, yawt0, steps):
-    yawt = [yawt0]
+    yawt = [0.0 for _ in range(len(yaw))]
+    yawt[0] = yawt0
 
     for i in range(1, len(yaw)):
-        yawt.append(yawt[i - 1] +
-                    steps[i - 1] / C.RTR * math.sin(yaw[i - 1] - yawt[i - 1]))
+        yawt[i] += yawt[i - 1] + steps[i - 1] / C.RTR * math.sin(yaw[i - 1] - yawt[i - 1])
 
     return yawt
 
@@ -403,10 +438,10 @@ def calc_rs_path_cost(rspath, yawt):
 
 
 def calc_motion_set():
-    s = np.arange(C.MAX_STEER / C.N_STEER,
-                  C.MAX_STEER, C.MAX_STEER / C.N_STEER)
+    s = [i for i in np.arange(C.MAX_STEER / C.N_STEER,
+                              C.MAX_STEER, C.MAX_STEER / C.N_STEER)]
 
-    steer = list(s) + [0.0] + list(-s)
+    steer = [0.0] + s + [-i for i in s]
     direc = [1.0 for _ in range(len(steer))] + [-1.0 for _ in range(len(steer))]
     steer = steer + steer
 
@@ -455,10 +490,20 @@ def is_index_ok(node, yawt0, P):
 
 
 def calc_parameters(ox, oy, xyreso, yawreso, kdtree):
-    minx = round(min(ox) / xyreso)
-    miny = round(min(oy) / xyreso)
-    maxx = round(max(ox) / xyreso)
-    maxy = round(max(oy) / xyreso)
+    minxm = min(ox) - C.EXTEND_AREA
+    minym = min(oy) - C.EXTEND_AREA
+    maxxm = max(ox) + C.EXTEND_AREA
+    maxym = max(oy) + C.EXTEND_AREA
+
+    ox.append(minxm)
+    oy.append(minym)
+    ox.append(maxxm)
+    oy.append(maxym)
+
+    minx = round(minxm / xyreso)
+    miny = round(minym / xyreso)
+    maxx = round(maxxm / xyreso)
+    maxy = round(maxym / xyreso)
 
     xw, yw = maxx - minx, maxy - miny
 
@@ -554,41 +599,115 @@ def draw_model(x, y, yaw, yawt, steer, color='black'):
 def design_obstacles():
     ox, oy = [], []
 
-    for i in range(0, 71):
-        ox.append(float(i))
+    for i in range(-30, 31):
+        ox.append(i)
+        oy.append(38)
+
+    for i in range(-30, -5):
+        ox.append(i)
+        oy.append(23)
+
+    for i in range(6, 31):
+        ox.append(i)
+        oy.append(23)
+
+    for j in range(0, 23):
+        ox.append(-6)
+        oy.append(j)
+
+    for j in range(0, 23):
+        ox.append(6)
+        oy.append(j)
+
+    for i in range(-6, 7):
+        ox.append(i)
         oy.append(0)
 
-    for i in range(0, 71):
-        ox.append(float(i))
-        oy.append(50)
-
-    for j in range(0, 50):
-        ox.append(0)
-        oy.append(j)
-
-    for j in range(0, 50):
-        ox.append(70)
-        oy.append(j)
-
     return ox, oy
+
+
+def test(x, y, yaw, yawt, ox, oy):
+    d = 0.5
+    deltal = (C.RTF - C.RTB) / 2.0
+    rt = (C.RTF + C.RTB) / 2.0 + d
+
+    ctx = x + deltal * math.cos(yawt)
+    cty = y + deltal * math.sin(yawt)
+
+    deltal = (C.RF - C.RB) / 2.0
+    rc = (C.RF + C.RB) / 2.0 + d
+
+    xot = ox - ctx
+    yot = oy - cty
+
+    dx_trail = xot * math.cos(yawt) + yot * math.sin(yawt)
+    dy_trail = -xot * math.sin(yawt) + yot * math.cos(yawt)
+
+    if abs(dx_trail) <= rt - d and \
+            abs(dy_trail) <= C.W / 2.0:
+        print("test1: Collision")
+    else:
+        print("test1: No collision")
+
+    # test 2
+
+    cx = x + deltal * math.cos(yaw)
+    cy = y + deltal * math.sin(yaw)
+
+    xo = ox - cx
+    yo = oy - cy
+
+    dx_car = xo * math.cos(yaw) + yo * math.sin(yaw)
+    dy_car = -xo * math.sin(yaw) + yo * math.cos(yaw)
+
+    if abs(dx_car) <= rc - d and \
+            abs(dy_car) <= C.W / 2.0:
+        print("test2: Collision")
+    else:
+        print("test2: No collision")
+
+    theta = np.linspace(0, 2 * np.pi, 200)
+    x1 = ctx + np.cos(theta) * rt
+    y1 = cty + np.sin(theta) * rt
+    x2 = cx + np.cos(theta) * rc
+    y2 = cy + np.sin(theta) * rc
+
+    plt.plot(x1, y1, 'b')
+    plt.plot(x2, y2, 'g')
+    plt.plot(ox, oy, 'sr')
+
+    plt.plot([-rc, -rc, rc, rc, -rc],
+             [C.W / 2, -C.W / 2, -C.W / 2, C.W / 2, C.W / 2])
+    plt.plot([-rt, -rt, rt, rt, -rt],
+             [C.W / 2, -C.W / 2, -C.W / 2, C.W / 2, C.W / 2])
+    plt.plot(dx_car, dy_car, 'sr')
+    plt.plot(dx_trail, dy_trail, 'sg')
 
 
 def main():
     print("start!")
 
-    sx, sy = 20.0, 10.0  # [m]
+    sx, sy = -15.0, 28.0  # [m]
     syaw0 = np.deg2rad(00.0)
     syawt = np.deg2rad(00.0)
 
-    gx, gy = 55.0, 40.0  # [m]
+    gx, gy = 00.0, 12.0  # [m]
     gyaw0 = np.deg2rad(90.0)
     gyawt = np.deg2rad(90.0)
 
     ox, oy = design_obstacles()
+    plt.plot(ox, oy, 'sk')
+    draw_model(sx, sy, syaw0, syawt, 0.0)
+    draw_model(gx, gy, gyaw0, gyawt, 0.0)
+    # test(sx, sy, syaw0, syawt, 3.5, 32)
+    # plt.axis("equal")
+    # plt.show()
+
+    oox, ooy = ox[:], oy[:]
 
     t0 = time.time()
     path = hybrid_astar_planning(sx, sy, syaw0, syawt, gx, gy, gyaw0, gyawt,
-                                 ox, oy, C.XY_RESO, C.YAW_RESO)
+                                 oox, ooy, C.XY_RESO, C.YAW_RESO)
     t1 = time.time()
     print("running time: ", t1 - t0)
 
@@ -598,6 +717,8 @@ def main():
     yawt = path.yawt
     direction = path.direction
 
+    plt.pause(5)
+ 
     for k in range(len(x)):
         plt.cla()
         plt.plot(ox, oy, "sk")
@@ -609,7 +730,7 @@ def main():
         else:
             steer = 0.0
 
-        draw_model(gx, gy, gyaw0, gyawt, 0.0)
+        draw_model(gx, gy, gyaw0, gyawt, 0.0, 'gray')
         draw_model(x[k], y[k], yaw[k], yawt[k], steer)
         plt.axis("equal")
         plt.pause(0.0001)
