@@ -40,7 +40,6 @@ class C:  # Parameter config
     TR = 0.5  # [m] tyre radius
     TW = 1.0  # [m] tyre width
     MAX_STEER = 0.6  # [rad] maximum steering angle
-    EXTEND_BOUND = 0.5  # collision check range extended
 
 
 class Node:
@@ -264,19 +263,19 @@ def analystic_expantion(node, ngoal, P):
         yawt = calc_trailer_yaw(path.yaw, node.yawt[-1], steps)
         pq.put(path, calc_rs_path_cost(path, yawt))
 
-    while not pq.empty():
-        path = pq.get()
-        steps = [C.MOVE_STEP * d for d in path.directions]
-        yawt = calc_trailer_yaw(path.yaw, node.yawt[-1], steps)
-        ind = range(0, len(path.x), C.COLLISION_CHECK_STEP)
+    # while not pq.empty():
+    path = pq.get()
+    steps = [C.MOVE_STEP * d for d in path.directions]
+    yawt = calc_trailer_yaw(path.yaw, node.yawt[-1], steps)
+    ind = range(0, len(path.x), C.COLLISION_CHECK_STEP)
 
-        pathx = [path.x[k] for k in ind]
-        pathy = [path.y[k] for k in ind]
-        pathyaw = [path.yaw[k] for k in ind]
-        pathyawt = [yawt[k] for k in ind]
+    pathx = [path.x[k] for k in ind]
+    pathy = [path.y[k] for k in ind]
+    pathyaw = [path.yaw[k] for k in ind]
+    pathyawt = [yawt[k] for k in ind]
 
-        if not is_collision(pathx, pathy, pathyaw, pathyawt, P):
-            return path
+    if not is_collision(pathx, pathy, pathyaw, pathyawt, P):
+        return path
 
     return None
 
@@ -601,25 +600,25 @@ def design_obstacles():
 
     for i in range(-30, 31):
         ox.append(i)
-        oy.append(38)
+        oy.append(21)
 
-    for i in range(-30, -5):
+    for i in range(-30, -12):
         ox.append(i)
-        oy.append(23)
+        oy.append(7)
 
-    for i in range(6, 31):
+    for i in range(13, 31):
         ox.append(i)
-        oy.append(23)
+        oy.append(7)
 
-    for j in range(0, 23):
-        ox.append(-6)
+    for j in range(0, 8):
+        ox.append(12)
         oy.append(j)
 
-    for j in range(0, 23):
-        ox.append(6)
+    for j in range(0, 8):
+        ox.append(-12)
         oy.append(j)
 
-    for i in range(-6, 7):
+    for i in range(-12, 13):
         ox.append(i)
         oy.append(0)
 
@@ -687,13 +686,13 @@ def test(x, y, yaw, yawt, ox, oy):
 def main():
     print("start!")
 
-    sx, sy = -15.0, 28.0  # [m]
-    syaw0 = np.deg2rad(00.0)
-    syawt = np.deg2rad(00.0)
+    sx, sy = 18.0, 17.0  # [m]
+    syaw0 = np.deg2rad(180.0)
+    syawt = np.deg2rad(180.0)
 
-    gx, gy = 00.0, 12.0  # [m]
-    gyaw0 = np.deg2rad(90.0)
-    gyawt = np.deg2rad(90.0)
+    gx, gy = 2.0, 4.0  # [m]
+    gyaw0 = np.deg2rad(00.0)
+    gyawt = np.deg2rad(00.0)
 
     ox, oy = design_obstacles()
     plt.plot(ox, oy, 'sk')
@@ -717,8 +716,8 @@ def main():
     yawt = path.yawt
     direction = path.direction
 
-    plt.pause(5)
- 
+    plt.pause(10)
+
     for k in range(len(x)):
         plt.cla()
         plt.plot(ox, oy, "sk")
