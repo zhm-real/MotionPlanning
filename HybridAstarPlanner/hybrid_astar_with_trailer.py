@@ -10,11 +10,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 import scipy.spatial.kdtree as kd
 
-from Hybrid_Astar.init_env import *
+from HybridAstarPlanner.init_env import *
 
-import Hybrid_Astar.astar as astar
-import Hybrid_Astar.draw as draw
-import CurvesPlanner.reeds_shepp_path as rs
+import HybridAstarPlanner.astar as astar
+import HybridAstarPlanner.draw as draw
+import CurvesGenerator.reeds_shepp_path as rs
 
 
 class C:  # Parameter config
