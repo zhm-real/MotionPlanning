@@ -1,3 +1,8 @@
+"""
+Hybrid A* with trailer
+@author: Huiming Zhou
+"""
+
 import math
 import heapq
 import time
@@ -5,9 +10,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 import scipy.spatial.kdtree as kd
 
-import astar
-import reeds_shepp_path as rs
-import draw
+from Hybrid_Astar.init_env import *
+
+import Hybrid_Astar.astar as astar
+import Hybrid_Astar.draw as draw
+import CurvesPlanner.reeds_shepp_path as rs
 
 
 class C:  # Parameter config

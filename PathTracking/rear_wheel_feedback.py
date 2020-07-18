@@ -182,7 +182,6 @@ def main():
     x_rec, y_rec, yaw_rec, direct_rec = [], [], [], []
 
     for cx, cy, cyaw, cdirect, ccurv in zip(x_ref, y_ref, yaw_ref, direct, curv):
-        print(cdirect)
         t = 0.0
         node = Node(x=x0, y=y0, yaw=yaw0, v=0.0, direct=cdirect[0])
         ref_trajectory = Trajectory(cx, cy, cyaw, ccurv)
