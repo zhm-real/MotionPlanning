@@ -14,7 +14,7 @@ from HybridAstarPlanner.init_env import *
 
 import HybridAstarPlanner.astar as astar
 import HybridAstarPlanner.draw as draw
-import CurvesGenerator.reeds_shepp_path as rs
+import CurvesGenerator.reeds_shepp as rs
 
 
 class C:  # Parameter config
