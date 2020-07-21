@@ -5,12 +5,18 @@ Path tracking simulation with iterative linear model predictive control for spee
 author: Atsushi Sakai (@Atsushi_twi)
 
 """
+import os
+import sys
 import matplotlib.pyplot as plt
 import cvxpy
 import math
 import numpy as np
-import pycubicspline.pycubicspline as cs
-import draw
+
+
+sys.path.append(os.path.dirname(os.path.abspath(__file__)) +
+                "/../../MotionPlanning/")
+
+import CurvesGenerator.cubic_spline as cs
 
 
 NX = 4  # x = x, y, v, yaw

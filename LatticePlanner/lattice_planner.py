@@ -1,16 +1,14 @@
 import os
 import sys
 import math
-import heapq
 import copy
 import numpy as np
 import matplotlib.pyplot as plt
-import scipy.spatial.kdtree as kd
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)) +
                 "/../../MotionPlanning/")
 
-import CurvesGenerator as CG
+from CurvesGenerator import cubic_spline, quintic_polynomial, quartic_polynomial
 
 
 SIM_LOOP = 500
@@ -60,31 +58,35 @@ class FrenetPath:
         self.c = []
 
 
-def calc_frenet_paths(x0, v0, a0, c_speed, s0):
+def calc_frenet_paths(c_speed, c_d, c_d_d, c_d_dd, s0):
     frenet_paths = []
 
+    # generate path to each offset goal
     for di in np.arange(-MAX_ROAD_WIDTH, MAX_ROAD_WIDTH, D_ROAD_W):
-        # lateral sampling
+
+        # Lateral motion planning
         for Ti in np.arange(MIN_T, MAX_T, DT):
             fp = FrenetPath()
-            lat_qp = CG.QuinticPolynomial(x0, v0, a0, di, 0.0, 0.0, Ti)
+
+            # lat_qp = quintic_polynomial(c_d, c_d_d, c_d_dd, di, 0.0, 0.0, Ti)
+            lat_qp = quintic_polynomial.QuinticPolynomial(c_d, c_d_d, c_d_dd, di, 0.0, 0.0, Ti)
 
             fp.t = [t for t in np.arange(0.0, Ti, DT)]
-            fp.d = [lat_qp.calc_xt(t) for t in fp.t]
-            fp.d_d = [lat_qp.calc_dxt(t) for t in fp.t]
-            fp.d_dd = [lat_qp.calc_ddxt(t) for t in fp.t]
-            fp.d_ddd = [lat_qp.calc_dddxt(t) for t in fp.t]
+            fp.d = [lat_qp.calc_point(t) for t in fp.t]
+            fp.d_d = [lat_qp.calc_first_derivative(t) for t in fp.t]
+            fp.d_dd = [lat_qp.calc_second_derivative(t) for t in fp.t]
+            fp.d_ddd = [lat_qp.calc_third_derivative(t) for t in fp.t]
 
-            # longitudinal sampling
+            # Longitudinal motion planning (Velocity keeping)
             for tv in np.arange(TARGET_SPEED - D_T_S * N_S_SAMPLE,
                                 TARGET_SPEED + D_T_S * N_S_SAMPLE, D_T_S):
                 tfp = copy.deepcopy(fp)
-                lon_qp = QuarticPolynomial(s0, c_speed, 0.0, tv, 0.0, Ti)
+                lon_qp = quartic_polynomial.QuarticPolynomial(s0, c_speed, 0.0, tv, 0.0, Ti)
 
-                tfp.s = [lon_qp.calc_xt(t) for t in fp.t]
-                tfp.s_d = [lon_qp.calc_dxt(t) for t in fp.t]
-                tfp.s_dd = [lon_qp.calc_ddxt(t) for t in fp.t]
-                tfp.s_ddd = [lon_qp.calc_dddxt(t) for t in fp.t]
+                tfp.s = [lon_qp.calc_point(t) for t in fp.t]
+                tfp.s_d = [lon_qp.calc_first_derivative(t) for t in fp.t]
+                tfp.s_dd = [lon_qp.calc_second_derivative(t) for t in fp.t]
+                tfp.s_ddd = [lon_qp.calc_third_derivative(t) for t in fp.t]
 
                 Jp = sum(np.power(tfp.d_ddd, 2))  # square of jerk
                 Js = sum(np.power(tfp.s_ddd, 2))  # square of jerk
@@ -102,10 +104,9 @@ def calc_frenet_paths(x0, v0, a0, c_speed, s0):
 
 
 def calc_global_paths(fplist, csp):
-    # csp: reference path
     for fp in fplist:
 
-        # calc global position
+        # calc global positions
         for i in range(len(fp.s)):
             ix, iy = csp.calc_position(fp.s[i])
             if ix is None:
@@ -117,6 +118,7 @@ def calc_global_paths(fplist, csp):
             fp.x.append(fx)
             fp.y.append(fy)
 
+        # calc yaw and ds
         for i in range(len(fp.x) - 1):
             dx = fp.x[i + 1] - fp.x[i]
             dy = fp.y[i + 1] - fp.y[i]
@@ -126,6 +128,7 @@ def calc_global_paths(fplist, csp):
         fp.yaw.append(fp.yaw[-1])
         fp.ds.append(fp.ds[-1])
 
+        # calc curvature
         for i in range(len(fp.yaw) - 1):
             fp.c.append((fp.yaw[i + 1] - fp.yaw[i]) / fp.ds[i])
 
@@ -181,7 +184,7 @@ def frenet_optimal_planning(csp, s0, c_speed, c_d, c_d_d, c_d_dd, ob):
 
 
 def generate_target_course(x, y):
-    csp = pycubicspline.Spline2D(x, y)
+    csp = cubic_spline.Spline2D(x, y)
     s = np.arange(0, csp.s[-1], 0.1)
 
     rx, ry, ryaw, rk = [], [], [], []
@@ -234,27 +237,29 @@ def main():
             print("Goal")
             break
 
-        plt.cla()
-        # for stopping simulation with the esc key.
-        plt.gcf().canvas.mpl_connect(
-            'key_release_event',
-            lambda event: [exit(0) if event.key == 'escape' else None])
-        plt.plot(tx, ty)
-        plt.plot(ob[:, 0], ob[:, 1], "xk")
-        plt.plot(path.x[1:], path.y[1:], "-or")
-        plt.plot(path.x[1], path.y[1], "vc")
-        # plt.xlim(path.x[1] - area, path.x[1] + area)
-        # plt.ylim(path.y[1] - area, path.y[1] + area)
-        plt.title("v[km/h]:" + str(c_speed * 3.6)[0:4])
-        plt.axis("equal")
+        if 2 > 0:  # pragma: no cover
+            plt.cla()
+            # for stopping simulation with the esc key.
+            plt.gcf().canvas.mpl_connect(
+                'key_release_event',
+                lambda event: [exit(0) if event.key == 'escape' else None])
+            plt.plot(tx, ty)
+            plt.plot(ob[:, 0], ob[:, 1], "xk")
+            plt.plot(path.x[1:], path.y[1:], "-or")
+            plt.plot(path.x[1], path.y[1], "vc")
+            # plt.xlim(path.x[1] - area, path.x[1] + area)
+            # plt.ylim(path.y[1] - area, path.y[1] + area)
+            plt.title("v[km/h]:" + str(c_speed * 3.6)[0:4])
+            plt.axis("equal")
+            plt.grid(True)
+            plt.pause(0.0001)
+
+    print("Finish")
+    if 2 > 0:  # pragma: no cover
         plt.grid(True)
         plt.pause(0.0001)
-
-    plt.grid(True)
-    plt.pause(0.0001)
-    plt.show()
+        plt.show()
 
 
 if __name__ == '__main__':
     main()
-

@@ -1,10 +1,15 @@
+import os
+import sys
 import math
 import numpy as np
 import matplotlib.pyplot as plt
 
-import draw
-import reeds_shepp_path as rs
-import pycubicspline.pycubicspline as cs
+sys.path.append(os.path.dirname(os.path.abspath(__file__)) +
+                "/../../MotionPlanning/")
+
+import Control.draw as draw
+import Control.reeds_shepp_path as rs
+import CurvesGenerator.cubic_spline as cs
 
 
 class C:
