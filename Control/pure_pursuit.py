@@ -10,7 +10,7 @@ class C:
     Kp = 0.3  # proportional gain
     Ld = 3.0  # look ahead distance
     kf = 0.1  # look forward gain
-    dt = 0.1  # time step
+    dt = 0.1  # T step
     dref = 0.5  # stop distance
     dc = 0.0
 

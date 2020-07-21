@@ -3,6 +3,8 @@ Hybrid A*
 @author: Huiming Zhou
 """
 
+import os
+import sys
 import math
 import heapq
 import time
@@ -10,11 +12,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 import scipy.spatial.kdtree as kd
 
-from HybridAstarPlanner.init_env import *
+sys.path.append(os.path.dirname(os.path.abspath(__file__)) +
+                "/../../MotionPlanning/")
 
 import HybridAstarPlanner.astar as astar
 import HybridAstarPlanner.draw as draw
-import CurvesGenerator.reeds_shepp as rs
+import HybridAstarPlanner.reeds_shepp as rs
 
 
 class C:  # Parameter config
@@ -495,7 +498,7 @@ def main():
     path = hybrid_astar_planning(sx, sy, syaw0, gx, gy, gyaw0,
                                  ox, oy, C.XY_RESO, C.YAW_RESO)
     t1 = time.time()
-    print("running time: ", t1 - t0)
+    print("running T: ", t1 - t0)
 
     if not path:
         print("Searching failed!")

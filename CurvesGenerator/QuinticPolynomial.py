@@ -1,8 +1,3 @@
-"""
-original author: Atsushi Sakai (@Atsushi_twi)
-modified: huiming zhou
-"""
-
 import math
 import numpy as np
 import matplotlib.pyplot as plt
@@ -11,6 +6,7 @@ from CurvesGenerator import draw
 
 
 class QuinticPolynomial:
+
     def __init__(self, x0, dx0, ddx0, x1, dx1, ddx1, T):
         A = np.array([[T ** 3, T ** 4, T ** 5],
                       [3 * T ** 2, 4 * T ** 3, 5 * T ** 4],
@@ -28,24 +24,24 @@ class QuinticPolynomial:
         self.a5 = X[2]
         self.T = T
 
-    def calc_t(self, t):
+    def calc_xt(self, t):
         xt = self.a0 + self.a1 * t + self.a2 * t ** 2 + \
              self.a3 * t ** 3 + self.a4 * t ** 4 + self.a5 * t ** 5
         return xt
 
-    def calc_dt(self, t):
+    def calc_dxt(self, t):
         dxt = self.a1 + 2 * self.a2 * t + \
              3 * self.a3 * t ** 2 + 4 * self.a4 * t ** 3 + 5 * self.a5 * t ** 4
 
         return dxt
 
-    def calc_ddt(self, t):
+    def calc_ddxt(self, t):
         ddxt = 2 * self.a2 + 6 * self.a3 * t + \
               12 * self.a4 * t ** 2 + 20 * self.a5 * t ** 3
 
         return ddxt
 
-    def calc_dddt(self, t):
+    def calc_dddxt(self, t):
         dddxt = 6 * self.a3 + 24 * self.a4 * t + 60 * self.a5 * t ** 2
 
         return dddxt
@@ -57,7 +53,7 @@ def simulation():
 
     MAX_ACCEL = 1.0  # max accel [m/ss]
     MAX_JERK = 0.5  # max jerk [m/sss]
-    dt = 0.1  # time tick [s]
+    dt = 0.1  # T tick [s]
 
     MIN_T = 5
     MAX_T = 100
@@ -83,24 +79,24 @@ def simulation():
 
         for t in np.arange(0.0, T + dt, dt):
             trec.append(t)
-            xrec.append(xqp.calc_t(t))
-            yrec.append(yqp.calc_t(t))
+            xrec.append(xqp.calc_xt(t))
+            yrec.append(yqp.calc_xt(t))
 
-            vx = xqp.calc_dt(t)
-            vy = yqp.calc_dt(t)
+            vx = xqp.calc_dxt(t)
+            vy = yqp.calc_dxt(t)
             vrec.append(np.hypot(vx, vy))
             yawrec.append(math.atan2(vy, vx))
 
-            ax = xqp.calc_ddt(t)
-            ay = yqp.calc_ddt(t)
+            ax = xqp.calc_ddxt(t)
+            ay = yqp.calc_ddxt(t)
             a = np.hypot(ax, ay)
 
             if len(vrec) >= 2 and vrec[-1] - vrec[-2] < 0.0:
                 a *= -1
             arec.append(a)
 
-            jx = xqp.calc_dddt(t)
-            jy = yqp.calc_dddt(t)
+            jx = xqp.calc_dddxt(t)
+            jy = yqp.calc_dddxt(t)
             j = np.hypot(jx, jy)
 
             if len(arec) >= 2 and arec[-1] - arec[-2] < 0.0:

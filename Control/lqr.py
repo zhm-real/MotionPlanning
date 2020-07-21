@@ -110,7 +110,7 @@ class Trajectory:
 
 def dlqr(A, B, Q, R):
     """
-    Solve the discrete time lqr controller
+    Solve the discrete T lqr controller
     x[k+1] = A*x[k] + B*u[k]
     cost function = sum(x[k].T*Q*x[k] + u[k].T*R*u[k])
     """
