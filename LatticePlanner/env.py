@@ -23,8 +23,8 @@ class ENV:
 
     def design_reference_line(self):
         rx, ry, ryaw, rc = [], [], [], []
-        step_curve = 0.15 * math.pi
-        step_line = 8
+        step_curve = 0.1 * math.pi
+        step_line = 4
 
         cx, cy, cr = 30, 30, 20
         theta = np.arange(math.pi, math.pi * 1.5, step_curve)
