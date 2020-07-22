@@ -19,9 +19,9 @@ MAX_ACCEL = 2.0  # maximum acceleration [m/ss]
 MAX_CURVATURE = 1.0  # maximum curvature [1/m]
 MAX_ROAD_WIDTH = 7.0  # maximum road width [m]
 D_ROAD_W = 1.0  # road width sampling length [m]
-DT = 0.2  # time tick [s]
-MAX_T = 5.0  # max prediction time [m]
-MIN_T = 4.0  # min prediction time [m]
+DT = 0.2  # T tick [s]
+MAX_T = 5.0  # max prediction T [m]
+MIN_T = 4.0  # min prediction T [m]
 TARGET_SPEED = 30.0 / 3.6  # target speed [m/s]
 D_T_S = 5.0 / 3.6  # target speed sampling length [m/s]
 N_S_SAMPLE = 1  # sampling number of target speed
@@ -72,10 +72,10 @@ def calc_frenet_paths(c_speed, c_d, c_d_d, c_d_dd, s0):
             lat_qp = quintic_polynomial.QuinticPolynomial(c_d, c_d_d, c_d_dd, di, 0.0, 0.0, Ti)
 
             fp.t = [t for t in np.arange(0.0, Ti, DT)]
-            fp.d = [lat_qp.calc_point(t) for t in fp.t]
-            fp.d_d = [lat_qp.calc_first_derivative(t) for t in fp.t]
-            fp.d_dd = [lat_qp.calc_second_derivative(t) for t in fp.t]
-            fp.d_ddd = [lat_qp.calc_third_derivative(t) for t in fp.t]
+            fp.d = [lat_qp.calc_xt(t) for t in fp.t]
+            fp.d_d = [lat_qp.calc_dxt(t) for t in fp.t]
+            fp.d_dd = [lat_qp.calc_ddxt(t) for t in fp.t]
+            fp.d_ddd = [lat_qp.calc_dddxt(t) for t in fp.t]
 
             # Longitudinal motion planning (Velocity keeping)
             for tv in np.arange(TARGET_SPEED - D_T_S * N_S_SAMPLE,
@@ -83,10 +83,10 @@ def calc_frenet_paths(c_speed, c_d, c_d_d, c_d_dd, s0):
                 tfp = copy.deepcopy(fp)
                 lon_qp = quartic_polynomial.QuarticPolynomial(s0, c_speed, 0.0, tv, 0.0, Ti)
 
-                tfp.s = [lon_qp.calc_point(t) for t in fp.t]
-                tfp.s_d = [lon_qp.calc_first_derivative(t) for t in fp.t]
-                tfp.s_dd = [lon_qp.calc_second_derivative(t) for t in fp.t]
-                tfp.s_ddd = [lon_qp.calc_third_derivative(t) for t in fp.t]
+                tfp.s = [lon_qp.calc_xt(t) for t in fp.t]
+                tfp.s_d = [lon_qp.calc_dxt(t) for t in fp.t]
+                tfp.s_dd = [lon_qp.calc_ddxt(t) for t in fp.t]
+                tfp.s_ddd = [lon_qp.calc_dddxt(t) for t in fp.t]
 
                 Jp = sum(np.power(tfp.d_ddd, 2))  # square of jerk
                 Js = sum(np.power(tfp.s_ddd, 2))  # square of jerk
