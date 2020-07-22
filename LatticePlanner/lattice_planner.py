@@ -9,15 +9,15 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)) +
                 "/../../MotionPlanning/")
 
 from CurvesGenerator import cubic_spline, quintic_polynomial, quartic_polynomial
-
+import LatticePlanner.env as env
 
 SIM_LOOP = 500
 
 # Parameter
 MAX_SPEED = 50.0 / 3.6  # maximum speed [m/s]
-MAX_ACCEL = 2.0  # maximum acceleration [m/ss]
-MAX_CURVATURE = 1.0  # maximum curvature [1/m]
-MAX_ROAD_WIDTH = 7.0  # maximum road width [m]
+MAX_ACCEL = 10.0  # maximum acceleration [m/ss]
+MAX_CURVATURE = 5.0  # maximum curvature [1/m]
+MAX_ROAD_WIDTH = 8.0  # maximum road width [m]
 D_ROAD_W = 1.0  # road width sampling length [m]
 DT = 0.2  # T tick [s]
 MAX_T = 5.0  # max prediction T [m]
@@ -61,17 +61,15 @@ class FrenetPath:
 def calc_frenet_paths(c_speed, c_d, c_d_d, c_d_dd, s0):
     frenet_paths = []
 
-    # generate path to each offset goal
     for di in np.arange(-MAX_ROAD_WIDTH, MAX_ROAD_WIDTH, D_ROAD_W):
 
         # Lateral motion planning
         for Ti in np.arange(MIN_T, MAX_T, DT):
             fp = FrenetPath()
 
-            # lat_qp = quintic_polynomial(c_d, c_d_d, c_d_dd, di, 0.0, 0.0, Ti)
             lat_qp = quintic_polynomial.QuinticPolynomial(c_d, c_d_d, c_d_dd, di, 0.0, 0.0, Ti)
 
-            fp.t = [t for t in np.arange(0.0, Ti, DT)]
+            fp.t = list(np.arange(0.0, Ti, DT))
             fp.d = [lat_qp.calc_xt(t) for t in fp.t]
             fp.d_d = [lat_qp.calc_dxt(t) for t in fp.t]
             fp.d_dd = [lat_qp.calc_ddxt(t) for t in fp.t]
@@ -99,6 +97,8 @@ def calc_frenet_paths(c_speed, c_d, c_d_d, c_d_dd, s0):
                 tfp.cf = K_LAT * tfp.cd + K_LON * tfp.cv
 
                 frenet_paths.append(tfp)
+
+    print("frenet path: ", len(frenet_paths))
 
     return frenet_paths
 
@@ -132,6 +132,8 @@ def calc_global_paths(fplist, csp):
         for i in range(len(fp.yaw) - 1):
             fp.c.append((fp.yaw[i + 1] - fp.yaw[i]) / fp.ds[i])
 
+    print("global path: ", len(fplist))
+
     return fplist
 
 
@@ -164,7 +166,9 @@ def check_paths(fplist, ob):
 
         ok_ind.append(i)
 
-    return [fplist[i] for i in ok_ind]
+    fp_get = [fplist[i] for i in ok_ind]
+
+    return fp_get
 
 
 def frenet_optimal_planning(csp, s0, c_speed, c_d, c_d_d, c_d_dd, ob):
@@ -183,57 +187,56 @@ def frenet_optimal_planning(csp, s0, c_speed, c_d, c_d_d, c_d_dd, ob):
     return best_path
 
 
-def generate_target_course(x, y):
-    csp = cubic_spline.Spline2D(x, y)
-    s = np.arange(0, csp.s[-1], 0.1)
+def get_reference_line(x, y):
+    cubicspline = cubic_spline.Spline2D(x, y)
+    s = np.arange(0, cubicspline.s[-1], 0.1)
 
     rx, ry, ryaw, rk = [], [], [], []
     for i_s in s:
-        ix, iy = csp.calc_position(i_s)
+        ix, iy = cubicspline.calc_position(i_s)
         rx.append(ix)
         ry.append(iy)
-        ryaw.append(csp.calc_yaw(i_s))
-        rk.append(csp.calc_curvature(i_s))
+        ryaw.append(cubicspline.calc_yaw(i_s))
+        rk.append(cubicspline.calc_curvature(i_s))
 
-    return rx, ry, ryaw, rk, csp
+    return rx, ry, ryaw, rk, cubicspline
 
 
 def main():
     print(__file__ + " start!!")
 
     # way points
-    wx = [0.0, 10.0, 20.5, 35.0, 70.5]
-    wy = [0.0, -6.0, 5.0, 6.5, 0.0]
+    ENV = env.ENV()
+    wx, wy = ENV.design_reference_line()
+    bx1, by1 = ENV.design_boundary_in()
+    bx2, by2 = ENV.design_boundary_out()
+
     # obstacle lists
-    ob = np.array([[20.0, 10.0],
-                   [30.0, 6.0],
-                   [30.0, 8.0],
-                   [35.0, 8.0],
-                   [50.0, 3.0]
+    ob = np.array([[60.0, 40.0],
+                   [10.0, 60.0]
                    ])
 
-    tx, ty, tyaw, tc, csp = generate_target_course(wx, wy)
-
-    # initial state
-    c_speed = 10.0 / 3.6  # current speed [m/s]
+    rx, ry, ryaw, rk, cubicspline = get_reference_line(wx, wy)
+    # # initial state
+    c_v = 20.0 / 3.6  # current speed [m/s]
     c_d = 2.0  # current lateral position [m]
-    c_d_d = 0.0  # current lateral speed [m/s]
-    c_d_dd = 0.0  # current lateral acceleration [m/s]
+    c_dv = 0.0  # current lateral speed [m/s]
+    c_da = 0.0  # current lateral acceleration [m/s]
     s0 = 0.0  # current course position
 
     area = 20.0  # animation area length [m]
 
     for i in range(SIM_LOOP):
         path = frenet_optimal_planning(
-            csp, s0, c_speed, c_d, c_d_d, c_d_dd, ob)
+            cubicspline, s0, c_v, c_d, c_dv, c_da, ob)
 
         s0 = path.s[1]
         c_d = path.d[1]
-        c_d_d = path.d_d[1]
-        c_d_dd = path.d_dd[1]
-        c_speed = path.s_d[1]
+        c_dv = path.d_d[1]
+        c_da = path.d_dd[1]
+        c_v = path.s_d[1]
 
-        if np.hypot(path.x[1] - tx[-1], path.y[1] - ty[-1]) <= 1.0:
+        if np.hypot(path.x[1] - rx[-1], path.y[1] - ry[-1]) <= 3.0:
             print("Goal")
             break
 
@@ -243,20 +246,20 @@ def main():
             plt.gcf().canvas.mpl_connect(
                 'key_release_event',
                 lambda event: [exit(0) if event.key == 'escape' else None])
-            plt.plot(tx, ty)
+            plt.plot(rx, ry)
+            plt.plot(bx1, by1, linewidth=1.5, color='k')
+            plt.plot(bx2, by2, linewidth=1.5, color='k')
             plt.plot(ob[:, 0], ob[:, 1], "xk")
             plt.plot(path.x[1:], path.y[1:], "-or")
             plt.plot(path.x[1], path.y[1], "vc")
             # plt.xlim(path.x[1] - area, path.x[1] + area)
             # plt.ylim(path.y[1] - area, path.y[1] + area)
-            plt.title("v[km/h]:" + str(c_speed * 3.6)[0:4])
+            plt.title("v[km/h]:" + str(c_v * 3.6)[0:4])
             plt.axis("equal")
-            plt.grid(True)
             plt.pause(0.0001)
 
     print("Finish")
     if 2 > 0:  # pragma: no cover
-        plt.grid(True)
         plt.pause(0.0001)
         plt.show()
 
