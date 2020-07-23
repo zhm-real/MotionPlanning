@@ -17,13 +17,13 @@ import LatticePlanner.draw as draw
 class C:
     # Parameter
     MAX_SPEED = 50.0 / 3.6
-    MAX_ACCEL = 10.0
-    MAX_CURVATURE = 10.0
+    MAX_ACCEL = 5.0
+    MAX_CURVATURE = 5.0
 
     ROAD_WIDTH = 8.0
     ROAD_SAMPLE_STEP = 1.0
 
-    T_STEP = 0.25
+    T_STEP = 0.20
     MAX_T = 5.0
     MIN_T = 4.0
 
@@ -31,20 +31,21 @@ class C:
     SPEED_SAMPLE_STEP = 5.0 / 3.6
 
     # cost weights
-    K_JERK = 0.1
+    K_JERK = 5.0
     K_TIME = 0.1
-    K_V_DIFF = 1.0
+    K_V_DIFF = 200.0
     K_OFFSET = 0.5
     K_COLLISION = 500
 
     # parameters for vehicle
-    RF = 4.5 * 1.5  # [m] distance from rear to vehicle front end of vehicle
-    RB = 1.0 * 1.5  # [m] distance from rear to vehicle back end of vehicle
-    W = 3.0 * 1.5  # [m] width of vehicle
+    K_SIZE = 1.0
+    RF = 4.5 * K_SIZE  # [m] distance from rear to vehicle front end of vehicle
+    RB = 1.0 * K_SIZE  # [m] distance from rear to vehicle back end of vehicle
+    W = 3.0 * K_SIZE  # [m] width of vehicle
     WD = 0.7 * W  # [m] distance between left-right wheels
-    WB = 3.5 * 1.5  # [m] Wheel base
-    TR = 0.5 * 1.5  # [m] Tyre radius
-    TW = 1 * 1.5  # [m] Tyre width
+    WB = 3.5 * K_SIZE  # [m] Wheel base
+    TR = 0.5 * K_SIZE  # [m] Tyre radius
+    TW = 1 * K_SIZE  # [m] Tyre width
     MAX_STEER = 0.6  # [rad] maximum steering angle
 
 
@@ -113,6 +114,50 @@ def sampling_paths_for_Cruising(l0, l0_v, l0_a, s0, s0_v, s0_a, ref_path):
     return PATHS
 
 
+def sampling_paths_for_Stopping(l0, l0_v, l0_a, s0, s0_v, s0_a, ref_path):
+    PATHS = dict()
+
+    for s1_v in [-2.0, -1.0, 0.0, 1.0, 2.0]:
+
+        for t1 in np.arange(1.0, 10.0, 1.0):
+            path_pre = Path()
+            path_lon = quintic_polynomial.QuinticPolynomial(s0, s0_v, s0_a, 49, s1_v, 0.0, t1)
+
+            path_pre.t = list(np.arange(0.0, t1, C.T_STEP))
+            path_pre.s = [path_lon.calc_xt(t) for t in path_pre.t]
+            path_pre.s_v = [path_lon.calc_dxt(t) for t in path_pre.t]
+            path_pre.s_a = [path_lon.calc_ddxt(t) for t in path_pre.t]
+            path_pre.s_jerk = [path_lon.calc_dddxt(t) for t in path_pre.t]
+
+            for l1 in np.arange(-C.ROAD_WIDTH, C.ROAD_WIDTH, C.ROAD_SAMPLE_STEP):
+                path = copy.deepcopy(path_pre)
+                path_lat = quintic_polynomial.QuinticPolynomial(l0, l0_v, l0_a, l1, 0.0, 0.0, t1)
+
+                path.l = [path_lat.calc_xt(t) for t in path_pre.t]
+                path.l_v = [path_lat.calc_dxt(t) for t in path_pre.t]
+                path.l_a = [path_lat.calc_ddxt(t) for t in path_pre.t]
+                path.l_jerk = [path_lat.calc_dddxt(t) for t in path_pre.t]
+
+                path.x, path.y = SL_2_XY(path.s, path.l, ref_path)
+                path.yaw, path.curv, path.ds = calc_yaw_curv(path.x, path.y)
+
+                if path.yaw is None:
+                    continue
+
+                l_jerk_sum = sum(np.abs(path.l_jerk))
+                s_jerk_sum = sum(np.abs(path.s_jerk))
+                v_diff = (path.s_v[-1]) ** 2
+
+                path.cost = C.K_JERK * (l_jerk_sum + s_jerk_sum) + \
+                            C.K_V_DIFF * v_diff + \
+                            C.K_TIME * t1 * 2 + \
+                            C.K_OFFSET * abs(path.l[-1])
+
+                PATHS[path] = path.cost
+
+    return PATHS
+
+
 def SL_2_XY(s_set, l_set, ref_path):
     pathx, pathy = [], []
 
@@ -140,6 +185,9 @@ def calc_yaw_curv(x, y):
         dy = y[i + 1] - y[i]
         ds.append(math.hypot(dx, dy))
         yaw.append(math.atan2(dy, dx))
+
+    if len(yaw) == 0:
+        return None, None, None
 
     yaw.append(yaw[-1])
     ds.append(ds[-1])
@@ -178,9 +226,16 @@ def is_path_collision(path):
 
 def verify_path(path):
     if any([v > C.MAX_SPEED for v in path.s_v]) or \
-            any([abs(a) > C.MAX_ACCEL for a in path.s_a]) or \
-            any([abs(curv) > C.MAX_CURVATURE for curv in path.curv]):
+            any([abs(a) > C.MAX_ACCEL for a in path.s_a]):
         return False
+
+    # if any([v > C.MAX_SPEED for v in path.s_v]) or \
+    #         any([abs(a) > C.MAX_ACCEL for a in path.s_a]):
+    #         # any([abs(curv) > C.MAX_CURVATURE for curv in path.curv]):
+    #     return False
+
+    # if is_path_collision(path):
+    #     return False
 
     return True
 
@@ -207,8 +262,15 @@ def lattice_planner_for_Cruising(l0, l0_v, l0_a, s0, s0_v, s0_a, ref_path):
     return path
 
 
+def lattice_planner_for_Stopping(l0, l0_v, l0_a, s0, s0_v, s0_a, ref_path):
+    paths = sampling_paths_for_Stopping(l0, l0_v, l0_a, s0, s0_v, s0_a, ref_path)
+    path = extract_optimal_path(paths)
+
+    return path
+
+
 def get_reference_line(x, y):
-    index = range(0, len(x), 2)
+    index = range(0, len(x), 3)
     x = [x[i] for i in index]
     y = [y[i] for i in index]
 
@@ -236,11 +298,11 @@ def pi_2_pi(theta):
     return theta
 
 
-def main():
-    ENV = env.ENV()
-    wx, wy = ENV.design_reference_line()
-    bx1, by1 = ENV.design_boundary_in()
-    bx2, by2 = ENV.design_boundary_out()
+def main_Crusing():
+    ENV = env.ENVCrusing()
+    wx, wy = ENV.ref_line
+    bx1, by1 = ENV.bound_in
+    bx2, by2 = ENV.bound_out
 
     C.obs = np.array([[50, 10], [96, 25], [70, 40],
                       [40, 50], [25, 75]])
@@ -255,9 +317,10 @@ def main():
     l0_a = 0.0  # current lateral acceleration [m/s]
     s0 = 0.0  # current course position
     s0_v = 20.0 / 3.6  # current speed [m/s]
+    s0_a = 0.0
 
     while True:
-        path = lattice_planner_for_Cruising(l0, l0_v, l0_a, s0, s0_v, 0.0, ref_path)
+        path = lattice_planner_for_Cruising(l0, l0_v, l0_a, s0, s0_v, s0_a, ref_path)
 
         if path is None:
             print("No feasible path found!!")
@@ -268,8 +331,9 @@ def main():
         l0_a = path.l_a[1]
         s0 = path.s[1]
         s0_v = path.s_v[1]
+        s0_a = path.s_a[1]
 
-        if np.hypot(path.x[1] - rx[-1], path.y[1] - ry[-1]) <= 3.0:
+        if np.hypot(path.x[1] - rx[-1], path.y[1] - ry[-1]) <= 2.0:
             print("Goal")
             break
 
@@ -287,7 +351,7 @@ def main():
         plt.plot(path.x[1:], path.y[1:], linewidth='2', color='royalblue')
         plt.plot(obs_x, obs_y, 'ok')
         draw.draw_car(path.x[1], path.y[1], path.yaw[1], steer, C)
-        plt.title("[Crusing Mode] - v :" + str(s0_v * 3.6)[0:4] + " km/h")
+        plt.title("[Crusing Mode]  v :" + str(s0_v * 3.6)[0:4] + " km/h")
         plt.axis("equal")
         plt.pause(0.0001)
 
@@ -295,5 +359,64 @@ def main():
     plt.show()
 
 
+def main_Stopping():
+    ENV = env.ENVStopping()
+    wx, wy = ENV.ref_line
+    bx1, by1 = ENV.bound_up
+    bx2, by2 = ENV.bound_down
+
+    C.ROAD_WIDTH = ENV.road_width
+    rx, ry, ryaw, rk, ref_path = get_reference_line(wx, wy)
+
+    l0 = 0.0  # current lateral position [m]
+    l0_v = 0.0  # current lateral speed [m/s]
+    l0_a = 0.0  # current lateral acceleration [m/s]
+    s0 = 0.0  # current course position
+    s0_v = 30.0 / 3.6  # current speed [m/s]
+    s0_a = 0.0
+
+    while True:
+        path = lattice_planner_for_Stopping(l0, l0_v, l0_a, s0, s0_v, s0_a, ref_path)
+
+        if path is None:
+            print("No feasible path found!!")
+            break
+
+        l0 = path.l[1]
+        l0_v = path.l_v[1]
+        l0_a = path.l_a[1]
+        s0 = path.s[1]
+        s0_v = path.s_v[1]
+        s0_a = path.s_a[1]
+
+        if np.hypot(path.x[1] - 49, path.y[1] - 0) <= 0.1:
+            print("Goal")
+            break
+
+        plt.cla()
+        # for stopping simulation with the esc key.
+        plt.gcf().canvas.mpl_connect(
+            'key_release_event',
+            lambda event: [exit(0) if event.key == 'escape' else None])
+        plt.plot(rx, ry, linestyle='--', color='gray')
+        plt.plot(bx1, by1, linewidth=1.5, color='k')
+        plt.plot(bx2, by2, linewidth=1.5, color='k')
+        plt.plot(path.x[1:], path.y[1:], linewidth='2', color='royalblue')
+        draw.draw_car(path.x[1], path.y[1], path.yaw[1], 0.0, C)
+        plt.title("[Crusing Mode]  v :" + str(s0_v * 3.6)[0:4] + " km/h")
+        plt.axis("equal")
+        plt.pause(0.0001)
+
+    plt.pause(0.0001)
+    plt.show()
+
+    plt.plot(rx, ry, linestyle='--', color='gray')
+    plt.plot(bx1, by1, linewidth=1.5, color='k')
+    plt.plot(bx2, by2, linewidth=1.5, color='k')
+    plt.axis("equal")
+    plt.show()
+
+
 if __name__ == '__main__':
-    main()
+    # main_Crusing()
+    main_Stopping()

@@ -2,33 +2,21 @@
 Environment for Lattice Planner Simulation
 """
 
-import os
-import sys
 import math
 import numpy as np
 import matplotlib.pyplot as plt
 
-sys.path.append(os.path.dirname(os.path.abspath(__file__)) +
-                "/../../MotionPlanning/")
 
-import CurvesGenerator.reeds_shepp as rs
-
-
-class ENV:
+class ENVCrusing:
     def __init__(self):
         self.max_c = 0.15
         self.road_width = 8.0
-        # self.ref_line = self.design_reference_line()
-        self.obs = self.design_obstacles()
+        self.ref_line = self.design_reference_line()
+        self.bound_in = self.design_boundary_in()
+        self.bound_out = self.design_boundary_out()
 
-    def design_obstacles(self):
-        obs = [[49, 10], [50, 10], [51, 10],
-               [96, 25], [70, 40], [69, 40],
-               [40, 50], [25, 75]]
-
-        return obs
-
-    def design_reference_line(self):
+    @staticmethod
+    def design_reference_line():
         rx, ry, ryaw, rc = [], [], [], []
         step_curve = 0.1 * math.pi
         step_line = 4
@@ -68,9 +56,6 @@ class ENV:
         for iy in np.arange(60, 30, -step_line):
             rx.append(10)
             ry.append(iy)
-
-        # rx.append(rx[0])
-        # ry.append(ry[0])
 
         return rx, ry
 
@@ -168,20 +153,49 @@ class ENV:
 
         return bx, by
 
-    def design_obstacles(self):
-        max_c = self.max_c
-        obs = []
 
-        return obs
+class ENVStopping:
+    def __init__(self):
+        self.road_width = 6.0
+        self.ref_line = self.design_reference_line()
+        self.bound_up = self.design_bound_up()
+        self.bound_down = self.design_bound_down()
+
+    @staticmethod
+    def design_reference_line():
+        rx, ry = [], []
+
+        for i in np.arange(0.0, 50.0, 2.0):
+            rx.append(i)
+            ry.append(0.0)
+
+        return rx, ry
+
+    def design_bound_up(self):
+        bx_up, by_up = [], []
+
+        for i in np.arange(0.0, 50.0, 0.1):
+            bx_up.append(i)
+            by_up.append(self.road_width)
+
+        return bx_up, by_up
+
+    def design_bound_down(self):
+        bx_down, by_down = [], []
+
+        for i in np.arange(0.0, 50.0, 0.1):
+            bx_down.append(i)
+            by_down.append(-self.road_width)
+
+        return bx_down, by_down
 
 
 def main():
-    env = ENV()
+    env = ENVCrusing()
     rx, ry = env.design_reference_line()
     bx1, by1 = env.design_boundary_in()
     bx2, by2 = env.design_boundary_out()
 
-    # plt.plot(rx, ry, linewidth=2, color='darkviolet')
     plt.plot(rx, ry, marker='.')
     plt.plot(bx1, by1, linewidth=1.5, color='k')
     plt.plot(bx2, by2, linewidth=1.5, color='k')
