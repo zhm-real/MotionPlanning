@@ -45,6 +45,9 @@ This repository uses two models: simple car model and [car pulling trailers mode
 </div>
 
 ## Useful Material
+* [ApolloAuto/apollo](https://github.com/ApolloAuto/apollo) by Baidu
+* [Optimal Trajectory Generation for Dynamic Street Scenarios in a Frenet Frame](https://www.researchgate.net/publication/224156269_Optimal_Trajectory_Generation_for_Dynamic_Street_Scenarios_in_a_Frenet_Frame) by Moritz Werling, etc
+* [Baidu Apollo EM Motion Planner](https://arxiv.org/abs/1807.08048) by Baidu
 * [Practical Search Techniques in Path Planning for Autonomous Driving](https://ai.stanford.edu/~ddolgov/papers/dolgov_gpp_stair08.pdf) by Stanford
 * [Hybrid Path Planner (C++)](https://github.com/karlkurzer/path_planner) by KTH Research Concept Vehicle
 * [hybrid-astar-planner (MATLAB)](https://github.com/wanghuohuo0716/hybrid_A_star) by Mengli Liu
