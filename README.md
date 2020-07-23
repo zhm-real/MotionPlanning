@@ -1,11 +1,13 @@
-# HybridAstar
+# Motion Planner
 ## Overview
-This is a python version of Hybrid A* algorithm, which can generate smooth paths for an autonomous vehicle operating in an unknown environment with obstacles. This algorithm was proposed by Stanford and was experimentally validated in 2007 DARPA Urban Challenge.
+This repository implemented some common motion planners in autonomous vehicles, including Hybrid A*, Lattice Planner and EM Planner (imcompleted). Also, this repository provides some controllers such as purpure pursuit, MPC, to track the path from planners.
 
 ## Requirement
 * Python 3.6 or above
 * [SciPy](https://www.scipy.org/)
+* [cvxpy](https://github.com/cvxgrp/cvxpy)
 * [Reeds-Shepp Curves](https://github.com/zhm-real/ReedsSheppCurves)
+* [pycubicspline](https://github.com/AtsushiSakai/pycubicspline)
 
 ## Vehicle models
 This repository uses two models: simple car model and [car pulling trailers model](http://planning.cs.uiuc.edu/node661.html#77556).
@@ -28,6 +30,16 @@ This repository uses two models: simple car model and [car pulling trailers mode
   <tr>
     <td><img src="https://github.com/zhm-real/MotionPlanning/blob/master/HybridAstarPlanner/gif/hybrid%20Astar-t3.gif" alt="13" width="400"/></a></td>
     <td><img src="https://github.com/zhm-real/MotionPlanning/blob/master/HybridAstarPlanner/gif/hybrid%20Astar-t2.gif" alt="14" width="400"/></a></td>
+  </tr>
+</table>
+</div>
+
+## State Lattice Planner
+<div align=right>
+<table>
+  <tr>
+    <td><img src="https://github.com/zhm-real/MotionPlanning/blob/master/LatticePlanner/gif/Crusing.gif" alt="1" width="400"/></a></td>
+    <td><img src="https://github.com/zhm-real/MotionPlanning/blob/master/LatticePlanner/gif/Stopping.gif" alt="2" width="400"/></a></td>
   </tr>
 </table>
 </div>
