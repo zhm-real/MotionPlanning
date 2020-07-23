@@ -10,8 +10,8 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)) +
                 "/../../MotionPlanning/")
 
 from CurvesGenerator import cubic_spline, quintic_polynomial, quartic_polynomial
-import LatticePlanner.env as env
-import LatticePlanner.draw as draw
+import StateLatticePlanner.env as env
+import StateLatticePlanner.draw as draw
 
 
 class C:
