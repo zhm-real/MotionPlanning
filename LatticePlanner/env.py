@@ -19,7 +19,14 @@ class ENV:
         self.max_c = 0.15
         self.road_width = 8.0
         # self.ref_line = self.design_reference_line()
-        # self.obs = self.design_obstacles()
+        self.obs = self.design_obstacles()
+
+    def design_obstacles(self):
+        obs = [[49, 10], [50, 10], [51, 10],
+               [96, 25], [70, 40], [69, 40],
+               [40, 50], [25, 75]]
+
+        return obs
 
     def design_reference_line(self):
         rx, ry, ryaw, rc = [], [], [], []
