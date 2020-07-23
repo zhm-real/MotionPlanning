@@ -80,7 +80,7 @@ class Trajectory:
                       [v / C.WB, 0.0],
                       [0.0, C.dt]])
 
-        K, _, _ = dlqr(A, B, Q, R)
+        K = dlqr(A, B, Q, R)
 
         x = np.array([[e],
                       [(e - pe) / C.dt],
@@ -90,7 +90,7 @@ class Trajectory:
 
         u_optimal = -K @ x
 
-        ff = math.atan2(C.WB * k, 1)  # feedforward steering angle
+        ff = math.atan(C.WB * k)  # feedforward steering angle
         fb = pi_2_pi(u_optimal[0, 0])  # feedback steering angle
         delta = (ff + fb)
         accel = u_optimal[1, 0]
@@ -119,11 +119,11 @@ def dlqr(A, B, Q, R):
     x[k+1] = A*x[k] + B*u[k]
     cost function = sum(x[k].T*Q*x[k] + u[k].T*R*u[k])
     """
+
     X = solve_ricatti(A, B, Q, R)
     K = np.linalg.inv(B.T @ X @ B + R) @ (B.T @ X @ A)
-    eig_result = np.linalg.eig(A - B @ K)
 
-    return K, X, eig_result[0]
+    return K
 
 
 def solve_ricatti(A, B, Q, R):
@@ -164,8 +164,8 @@ def calc_speed_profile(cyaw, target_speed):
             speed_profile[i] = 0.0
 
     # speed down
-    for i in range(40):
-        speed_profile[-i] = target_speed / (50 - i)
+    for i in range(70):
+        speed_profile[-i] = target_speed / (80 - i)
         if speed_profile[-i] <= 1.0 / 3.6:
             speed_profile[-i] = 1.0 / 3.6
 
