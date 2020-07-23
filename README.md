@@ -44,6 +44,22 @@ This repository uses two models: simple car model and [car pulling trailers mode
 </table>
 </div>
 
+## Controllers
+<div align=right>
+<table>
+  <tr>
+    <td><img src="https://github.com/zhm-real/MotionPlanning/blob/master/Control/gif/purepursuit1.gif" alt="1" width="400"/></a></td>
+    <td><img src="https://github.com/zhm-real/MotionPlanning/blob/master/Control/gif/purepursuit2.gif" alt="2" width="400"/></a></td>
+  </tr>
+</table>
+<table>
+  <tr>
+    <td><img src="https://github.com/zhm-real/MotionPlanning/blob/master/Control/gif/RWF1.gif" alt="1" width="400"/></a></td>
+    <td><img src="https://github.com/zhm-real/MotionPlanning/blob/master/Control/gif/RWF2.gif" alt="2" width="400"/></a></td>
+  </tr>
+</table>
+</div>
+
 ## Useful Material
 * [ApolloAuto/apollo](https://github.com/ApolloAuto/apollo) by Baidu
 * [Optimal Trajectory Generation for Dynamic Street Scenarios in a Frenet Frame](https://www.researchgate.net/publication/224156269_Optimal_Trajectory_Generation_for_Dynamic_Street_Scenarios_in_a_Frenet_Frame) by Moritz Werling, etc
