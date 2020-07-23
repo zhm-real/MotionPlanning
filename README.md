@@ -39,7 +39,7 @@ This repository uses two models: simple car model and [car pulling trailers mode
 <table>
   <tr>
     <td><img src="https://github.com/zhm-real/MotionPlanning/blob/master/LatticePlanner/gif/Crusing.gif" alt="1" width="400"/></a></td>
-    <td><img src="https://github.com/zhm-real/MotionPlanning/blob/master/LatticePlanner/gif/Stopping.gif" alt="2" width="400"/></a></td>
+    <td><img src="https://github.com/zhm-real/MotionPlanning/blob/master/LatticePlanner/gif/StoppingMode.gif" alt="2" width="400"/></a></td>
   </tr>
 </table>
 </div>
