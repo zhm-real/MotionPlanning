@@ -165,7 +165,7 @@ class ENVStopping:
     def design_reference_line():
         rx, ry = [], []
 
-        for i in np.arange(0.0, 50.0, 2.0):
+        for i in np.arange(0.0, 60.0, 1.0):
             rx.append(i)
             ry.append(0.0)
 
@@ -174,7 +174,7 @@ class ENVStopping:
     def design_bound_up(self):
         bx_up, by_up = [], []
 
-        for i in np.arange(0.0, 50.0, 0.1):
+        for i in np.arange(0.0, 60.0, 0.1):
             bx_up.append(i)
             by_up.append(self.road_width)
 
@@ -183,7 +183,7 @@ class ENVStopping:
     def design_bound_down(self):
         bx_down, by_down = [], []
 
-        for i in np.arange(0.0, 50.0, 0.1):
+        for i in np.arange(0.0, 60.0, 0.1):
             bx_down.append(i)
             by_down.append(-self.road_width)
 

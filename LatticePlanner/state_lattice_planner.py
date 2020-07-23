@@ -17,13 +17,13 @@ import LatticePlanner.draw as draw
 class C:
     # Parameter
     MAX_SPEED = 50.0 / 3.6
-    MAX_ACCEL = 5.0
-    MAX_CURVATURE = 5.0
+    MAX_ACCEL = 8.0
+    MAX_CURVATURE = 2.5
 
     ROAD_WIDTH = 8.0
     ROAD_SAMPLE_STEP = 1.0
 
-    T_STEP = 0.20
+    T_STEP = 0.150
     MAX_T = 5.0
     MIN_T = 4.0
 
@@ -31,14 +31,21 @@ class C:
     SPEED_SAMPLE_STEP = 5.0 / 3.6
 
     # cost weights
-    K_JERK = 5.0
+    # K_JERK = 0.1
+    # K_TIME = 0.1
+    # K_V_DIFF = 1.0
+    # K_OFFSET = 1.5
+    # K_COLLISION = 500
+
+    # cost weights for Stopping
+    K_JERK = 0.1
     K_TIME = 0.1
-    K_V_DIFF = 200.0
-    K_OFFSET = 0.5
+    K_V_DIFF = 200
+    K_OFFSET = 1.0
     K_COLLISION = 500
 
     # parameters for vehicle
-    K_SIZE = 1.0
+    K_SIZE = 0.9
     RF = 4.5 * K_SIZE  # [m] distance from rear to vehicle front end of vehicle
     RB = 1.0 * K_SIZE  # [m] distance from rear to vehicle back end of vehicle
     W = 3.0 * K_SIZE  # [m] width of vehicle
@@ -75,7 +82,7 @@ class Path:
 def sampling_paths_for_Cruising(l0, l0_v, l0_a, s0, s0_v, s0_a, ref_path):
     PATHS = dict()
 
-    for s1_v in np.arange(C.TARGET_SPEED * 0.8, C.TARGET_SPEED * 1.2, C.TARGET_SPEED * 0.1):
+    for s1_v in np.arange(C.TARGET_SPEED * 0.5, C.TARGET_SPEED * 1.2, C.TARGET_SPEED * 0.2):
 
         for t1 in np.arange(4.5, 5.5, 0.2):
             path_pre = Path()
@@ -117,11 +124,11 @@ def sampling_paths_for_Cruising(l0, l0_v, l0_a, s0, s0_v, s0_a, ref_path):
 def sampling_paths_for_Stopping(l0, l0_v, l0_a, s0, s0_v, s0_a, ref_path):
     PATHS = dict()
 
-    for s1_v in [-2.0, -1.0, 0.0, 1.0, 2.0]:
+    for s1_v in [-1.0, 0.0, 1.0, 2.0]:
 
-        for t1 in np.arange(1.0, 10.0, 1.0):
+        for t1 in np.arange(1.0, 16.0, 1.0):
             path_pre = Path()
-            path_lon = quintic_polynomial.QuinticPolynomial(s0, s0_v, s0_a, 49, s1_v, 0.0, t1)
+            path_lon = quintic_polynomial.QuinticPolynomial(s0, s0_v, s0_a, 55.0, s1_v, 0.0, t1)
 
             path_pre.t = list(np.arange(0.0, t1, C.T_STEP))
             path_pre.s = [path_lon.calc_xt(t) for t in path_pre.t]
@@ -129,7 +136,7 @@ def sampling_paths_for_Stopping(l0, l0_v, l0_a, s0, s0_v, s0_a, ref_path):
             path_pre.s_a = [path_lon.calc_ddxt(t) for t in path_pre.t]
             path_pre.s_jerk = [path_lon.calc_dddxt(t) for t in path_pre.t]
 
-            for l1 in np.arange(-C.ROAD_WIDTH, C.ROAD_WIDTH, C.ROAD_SAMPLE_STEP):
+            for l1 in [0.0]:
                 path = copy.deepcopy(path_pre)
                 path_lat = quintic_polynomial.QuinticPolynomial(l0, l0_v, l0_a, l1, 0.0, 0.0, t1)
 
@@ -151,7 +158,8 @@ def sampling_paths_for_Stopping(l0, l0_v, l0_a, s0, s0_v, s0_a, ref_path):
                 path.cost = C.K_JERK * (l_jerk_sum + s_jerk_sum) + \
                             C.K_V_DIFF * v_diff + \
                             C.K_TIME * t1 * 2 + \
-                            C.K_OFFSET * abs(path.l[-1])
+                            C.K_OFFSET * abs(path.l[-1]) + \
+                            50.0 * sum(np.abs(path.s_v))
 
                 PATHS[path] = path.cost
 
@@ -225,17 +233,14 @@ def is_path_collision(path):
 
 
 def verify_path(path):
-    if any([v > C.MAX_SPEED for v in path.s_v]) or \
-            any([abs(a) > C.MAX_ACCEL for a in path.s_a]):
-        return False
-
     # if any([v > C.MAX_SPEED for v in path.s_v]) or \
     #         any([abs(a) > C.MAX_ACCEL for a in path.s_a]):
-    #         # any([abs(curv) > C.MAX_CURVATURE for curv in path.curv]):
     #     return False
 
-    # if is_path_collision(path):
-    #     return False
+    if any([v > C.MAX_SPEED for v in path.s_v]) or \
+            any([abs(a) > C.MAX_ACCEL for a in path.s_a]) or \
+            any([abs(curv) > C.MAX_CURVATURE for curv in path.curv]):
+        return False
 
     return True
 
@@ -389,7 +394,7 @@ def main_Stopping():
         s0_v = path.s_v[1]
         s0_a = path.s_a[1]
 
-        if np.hypot(path.x[1] - 49, path.y[1] - 0) <= 0.1:
+        if np.hypot(path.x[1] - 56.0, path.y[1] - 0) <= 1.5:
             print("Goal")
             break
 
@@ -403,7 +408,7 @@ def main_Stopping():
         plt.plot(bx2, by2, linewidth=1.5, color='k')
         plt.plot(path.x[1:], path.y[1:], linewidth='2', color='royalblue')
         draw.draw_car(path.x[1], path.y[1], path.yaw[1], 0.0, C)
-        plt.title("[Crusing Mode]  v :" + str(s0_v * 3.6)[0:4] + " km/h")
+        plt.title("[Stopping Mode]  v :" + str(s0_v * 3.6)[0:4] + " km/h")
         plt.axis("equal")
         plt.pause(0.0001)
 
