@@ -1,6 +1,16 @@
 # Motion Planner
 ## Overview
-This repository implemented some common motion planners in autonomous vehicles, including Hybrid A*, Lattice Planner and EM Planner (imcompleted). Also, this repository provides some controllers such as purpure pursuit, MPC, to track the path from planners.
+This repository implemented some common motion planners used on autonomous vehicles, including
+* [Hybrid A* Planner](https://blog.habrador.com/2015/11/explaining-hybrid-star-pathfinding.html)
+* [Lattice Planner](https://www.researchgate.net/publication/224156269_Optimal_Trajectory_Generation_for_Dynamic_Street_Scenarios_in_a_Frenet_Frame)
+* [EM Planner](https://arxiv.org/abs/1807.08048) (imcompleted)
+
+Also, this repository provides some controllers for path tracking, including
+* [Pure Pursuit + PID](https://www.ri.cmu.edu/pub_files/pub3/coulter_r_craig_1992_1/coulter_r_craig_1992_1.pdf)
+* [Rear-Wheel Feedback + PID](https://www.ri.cmu.edu/pub_files/2009/2/Automatic_Steering_Methods_for_Autonomous_Automobile_Path_Tracking.pdf)
+* [Front-Wheel Feedback / Stanley + PID](http://robots.stanford.edu/papers/thrun.stanley05.pdf)
+* [LQR + PID](https://github.com/ApolloAuto/apollo/tree/master/modules/control/controller)
+* [Linear MPC](http://www.mpc.berkeley.edu/mpc-course-material)
 
 ## Requirement
 * Python 3.6 or above
