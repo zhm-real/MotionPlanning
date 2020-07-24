@@ -8,7 +8,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)) +
                 "/../../MotionPlanning/")
 
 import Control.draw as draw
-import Control.reeds_shepp_path as rs
+import CurvesGenerator.reeds_shepp as rs
 
 
 class C:

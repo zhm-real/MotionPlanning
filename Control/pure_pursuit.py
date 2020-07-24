@@ -8,10 +8,10 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)) +
                 "/../../MotionPlanning/")
 
 import Control.draw as draw
-import Control.reeds_shepp_path as rs
+import CurvesGenerator.reeds_shepp as rs
 
 
-class C:
+class P:
     Kp = 0.3  # proportional gain
     Ld = 3.0  # look ahead distance
     kf = 0.1  # look forward gain
@@ -267,4 +267,5 @@ def main():
 
 
 if __name__ == '__main__':
+    C = P
     main()
