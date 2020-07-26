@@ -28,13 +28,13 @@ class QuinticPolynomial:
 
     def calc_xt(self, t):
         xt = self.a0 + self.a1 * t + self.a2 * t ** 2 + \
-             self.a3 * t ** 3 + self.a4 * t ** 4 + self.a5 * t ** 5
+                self.a3 * t ** 3 + self.a4 * t ** 4 + self.a5 * t ** 5
 
         return xt
 
     def calc_dxt(self, t):
         dxt = self.a1 + 2 * self.a2 * t + \
-             3 * self.a3 * t ** 2 + 4 * self.a4 * t ** 3 + 5 * self.a5 * t ** 4
+            3 * self.a3 * t ** 2 + 4 * self.a4 * t ** 3 + 5 * self.a5 * t ** 4
 
         return dxt
 
