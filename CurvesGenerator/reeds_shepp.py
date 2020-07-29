@@ -470,7 +470,6 @@ def generate_local_course(L, lengths, mode, maxc, step_size):
     else:
         d = -step_size
 
-    pd = d
     ll = 0.0
 
     for m, l, i in zip(mode, lengths, range(len(mode))):
@@ -499,8 +498,11 @@ def generate_local_course(L, lengths, mode, maxc, step_size):
         px, py, pyaw, directions = \
             interpolate(ind, l, m, maxc, ox, oy, oyaw, px, py, pyaw, directions)
 
+    if len(px) <= 1:
+        return [], [], [], []
+
     # remove unused data
-    while px[-1] == 0.0:
+    while len(px) >= 1 and px[-1] == 0.0:
         px.pop()
         py.pop()
         pyaw.pop()
