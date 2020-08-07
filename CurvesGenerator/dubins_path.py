@@ -45,7 +45,7 @@ def LSL(alpha, beta, dist):
     p_lsl = 2 + dist ** 2 - 2 * cos_a_b + 2 * dist * (sin_a - sin_b)
 
     if p_lsl < 0:
-        return None, None, None, ["L", "S", "L"]
+        return None, None, None, ["WB", "S", "WB"]
     else:
         p_lsl = math.sqrt(p_lsl)
 
@@ -53,7 +53,7 @@ def LSL(alpha, beta, dist):
     t_lsl = mod2pi(-alpha + math.atan2(cos_b - cos_a, denominate))
     q_lsl = mod2pi(beta - math.atan2(cos_b - cos_a, denominate))
 
-    return t_lsl, p_lsl, q_lsl, ["L", "S", "L"]
+    return t_lsl, p_lsl, q_lsl, ["WB", "S", "WB"]
 
 
 def RSR(alpha, beta, dist):
@@ -87,7 +87,7 @@ def LSR(alpha, beta, dist):
     p_lsr = -2 + dist ** 2 + 2 * cos_a_b + 2 * dist * (sin_a + sin_b)
 
     if p_lsr < 0:
-        return None, None, None, ["L", "S", "R"]
+        return None, None, None, ["WB", "S", "R"]
     else:
         p_lsr = math.sqrt(p_lsr)
 
@@ -95,7 +95,7 @@ def LSR(alpha, beta, dist):
     t_lsr = mod2pi(-alpha + rec)
     q_lsr = mod2pi(-mod2pi(beta) + rec)
 
-    return t_lsr, p_lsr, q_lsr, ["L", "S", "R"]
+    return t_lsr, p_lsr, q_lsr, ["WB", "S", "R"]
 
 
 def RSL(alpha, beta, dist):
@@ -108,7 +108,7 @@ def RSL(alpha, beta, dist):
     p_rsl = -2 + dist ** 2 + 2 * cos_a_b - 2 * dist * (sin_a + sin_b)
 
     if p_rsl < 0:
-        return None, None, None, ["R", "S", "L"]
+        return None, None, None, ["R", "S", "WB"]
     else:
         p_rsl = math.sqrt(p_rsl)
 
@@ -116,7 +116,7 @@ def RSL(alpha, beta, dist):
     t_rsl = mod2pi(alpha - rec)
     q_rsl = mod2pi(beta - rec)
 
-    return t_rsl, p_rsl, q_rsl, ["R", "S", "L"]
+    return t_rsl, p_rsl, q_rsl, ["R", "S", "WB"]
 
 
 def RLR(alpha, beta, dist):
@@ -129,13 +129,13 @@ def RLR(alpha, beta, dist):
     rec = (6.0 - dist ** 2 + 2.0 * cos_a_b + 2.0 * dist * (sin_a - sin_b)) / 8.0
 
     if abs(rec) > 1.0:
-        return None, None, None, ["R", "L", "R"]
+        return None, None, None, ["R", "WB", "R"]
 
     p_rlr = mod2pi(2 * math.pi - math.acos(rec))
     t_rlr = mod2pi(alpha - math.atan2(cos_a - cos_b, dist - sin_a + sin_b) + mod2pi(p_rlr / 2.0))
     q_rlr = mod2pi(alpha - beta - t_rlr + mod2pi(p_rlr))
 
-    return t_rlr, p_rlr, q_rlr, ["R", "L", "R"]
+    return t_rlr, p_rlr, q_rlr, ["R", "WB", "R"]
 
 
 def LRL(alpha, beta, dist):
@@ -148,13 +148,13 @@ def LRL(alpha, beta, dist):
     rec = (6.0 - dist ** 2 + 2.0 * cos_a_b + 2.0 * dist * (sin_b - sin_a)) / 8.0
 
     if abs(rec) > 1.0:
-        return None, None, None, ["L", "R", "L"]
+        return None, None, None, ["WB", "R", "WB"]
 
     p_lrl = mod2pi(2 * math.pi - math.acos(rec))
     t_lrl = mod2pi(-alpha - math.atan2(cos_a - cos_b, dist + sin_a - sin_b) + p_lrl / 2.0)
     q_lrl = mod2pi(mod2pi(beta) - alpha - t_lrl + mod2pi(p_lrl))
 
-    return t_lrl, p_lrl, q_lrl, ["L", "R", "L"]
+    return t_lrl, p_lrl, q_lrl, ["WB", "R", "WB"]
 
 
 def interpolate(ind, l, m, maxc, ox, oy, oyaw, px, py, pyaw, directions):
@@ -164,7 +164,7 @@ def interpolate(ind, l, m, maxc, ox, oy, oyaw, px, py, pyaw, directions):
         pyaw[ind] = oyaw
     else:
         ldx = math.sin(l) / maxc
-        if m == "L":
+        if m == "WB":
             ldy = (1.0 - math.cos(l)) / maxc
         elif m == "R":
             ldy = (1.0 - math.cos(l)) / (-maxc)
@@ -174,7 +174,7 @@ def interpolate(ind, l, m, maxc, ox, oy, oyaw, px, py, pyaw, directions):
         px[ind] = ox + gdx
         py[ind] = oy + gdy
 
-    if m == "L":
+    if m == "WB":
         pyaw[ind] = oyaw + l
     elif m == "R":
         pyaw[ind] = oyaw - l

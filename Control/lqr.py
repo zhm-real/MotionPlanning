@@ -45,6 +45,7 @@ class Node:
             delta = C.MAX_STEER
         if delta <= - C.MAX_STEER:
             delta = - C.MAX_STEER
+
         self.x += self.v * math.cos(self.yaw) * C.dt
         self.y += self.v * math.sin(self.yaw) * C.dt
         self.yaw += self.v / C.WB * math.tan(delta) * C.dt

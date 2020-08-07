@@ -11,12 +11,15 @@ import Control.draw as draw
 import CurvesGenerator.reeds_shepp as rs
 
 
-class P:
+class C:
+    # PID config
     Kp = 0.3  # proportional gain
+
+    # system config
     Ld = 3.0  # look ahead distance
     kf = 0.1  # look forward gain
     dt = 0.1  # T step
-    dref = 0.5  # stop distance
+    dist_stop = 0.5  # stop distance
     dc = 0.0
 
     # vehicle config
@@ -27,7 +30,7 @@ class P:
     WB = 2.5  # [m] Wheel base
     TR = 0.44  # [m] Tyre radius
     TW = 0.7  # [m] Tyre width
-    MAX_STEER = 0.25
+    MAX_STEER = 0.30
 
 
 class Node:
@@ -73,73 +76,75 @@ class Trajectory:
 
     def target_index(self, node):
         if self.index_old is None:
-            dx = [node.x - x for x in self.cx]
-            dy = [node.y - y for y in self.cy]
-            ind = np.argmin(np.hypot(dx, dy))
-            self.index_old = ind
-        else:
-            ind = self.index_old
-
-            if ind >= self.ind_end:
-                self.index_old = self.ind_end
-            else:
-                d = self.calc_distance(node, ind)
-                while True:
-                    d_next = self.calc_distance(node, ind + 1)
-                    if d_next > d:
-                        break
-                    if ind + 1 >= self.ind_end:
-                        break
-                    ind += 1
-                    d = d_next
-
-                self.index_old = ind
+            self.calc_nearest_ind(node)
 
         Lf = C.kf * node.v + C.Ld
 
-        while True:
+        for ind in range(self.index_old, self.ind_end + 1):
             if self.calc_distance(node, ind) > Lf:
-                break
-            if ind >= self.ind_end:
-                break
-            ind += 1
+                self.index_old = ind
+                return ind, Lf
 
-        return ind, Lf
+        self.index_old = self.ind_end
+
+        return self.ind_end, Lf
+
+    def calc_nearest_ind(self, node):
+        dx = [node.x - x for x in self.cx]
+        dy = [node.y - y for y in self.cy]
+        ind = np.argmin(np.hypot(dx, dy))
+        self.index_old = ind
 
     def calc_distance(self, node, ind):
         return math.hypot(node.x - self.cx[ind], node.y - self.cy[ind])
 
 
-def pure_pursuit(node, trajectory, pind):
-    ind, Lf = trajectory.target_index(node)
-    ind = max(ind, pind)
+def pure_pursuit(node, trajectory, index_old):
+    ind, Lf = trajectory.target_index(node)  # target point and pursuit distance
+    ind = max(ind, index_old)
 
     tx = trajectory.cx[ind]
     ty = trajectory.cy[ind]
 
     alpha = math.atan2(ty - node.y, tx - node.x) - node.yaw
-    delta = math.atan2(2.0 * C.WB * math.sin(alpha) / Lf, 1.0)
+    delta = math.atan2(2.0 * C.WB * math.sin(alpha), Lf)
 
     return delta, ind
 
 
 def pid_control(target_v, v, dist, direct):
-    a = 0.2 * (target_v - direct * v)
-    if dist > 10.0:
-        a = 0.3 * (target_v - direct * v)
-    else:
-        if v > 2:
-            a = -3.0
-        elif v < -2:
+    """
+    design speed profile.
+    :param target_v: target speed (forward and backward are different)
+    :param v: current speed
+    :param dist: distance from current position to end position
+    :param direct: current direction
+    :return: desired acceleration
+    """
+
+    a = 0.3 * (target_v - direct * v)
+
+    if dist < 10.0:
+        if v > 3.0:
+            a = -2.5
+        elif v < -2.0:
             a = -1.0
+
     return a
 
 
 def generate_path(s):
-    max_c = math.tan(C.MAX_STEER) / C.WB
+    """
+    divide paths into some sections, in each section, the direction is the same.
+    :param s: target position and yaw
+    :return: sections
+    """
+
+    max_c = math.tan(C.MAX_STEER) / C.WB  # max curvature
+
     path_x, path_y, yaw, direct = [], [], [], []
     x_rec, y_rec, yaw_rec, direct_rec = [], [], [], []
-    direc_flag = 1.0
+    direct_flag = 1.0
 
     for i in range(len(s) - 1):
         s_x, s_y, s_yaw = s[i][0], s[i][1], np.deg2rad(s[i][2])
@@ -154,14 +159,14 @@ def generate_path(s):
         idirect = path_i.directions
 
         for j in range(len(ix)):
-            if idirect[j] == direc_flag:
+            if idirect[j] == direct_flag:
                 x_rec.append(ix[j])
                 y_rec.append(iy[j])
                 yaw_rec.append(iyaw[j])
                 direct_rec.append(idirect[j])
             else:
-                if len(x_rec) == 0 or direct_rec[0] != direc_flag:
-                    direc_flag = idirect[j]
+                if len(x_rec) == 0 or direct_rec[0] != direct_flag:
+                    direct_flag = idirect[j]
                     continue
 
                 path_x.append(x_rec)
@@ -177,6 +182,7 @@ def generate_path(s):
     direct.append(direct_rec)
 
     x_all, y_all = [], []
+
     for ix, iy in zip(path_x, path_y):
         x_all += ix
         y_all += iy
@@ -185,20 +191,20 @@ def generate_path(s):
 
 
 def main():
-    # generate path
-    # states = [(0, 0, 0), (20, 15, 0), (35, 20, 90), (40, 0, 180),
-    #           (20, 0, 120), (5, -10, 180), (15, 5, 30)]
+    # generate path: [x, y, yaw]
+    states = [(0, 0, 0), (20, 15, 0), (35, 20, 90), (40, 0, 180),
+              (20, 0, 120), (5, -10, 180), (15, 5, 30)]
 
-    states = [(-3, 3, 120), (10, -7, 30), (10, 13, 30), (20, 5, -25),
-              (35, 10, 180), (30, -10, 160), (5, -12, 90)]
+    # states = [(-3, 3, 120), (10, -7, 30), (10, 13, 30), (20, 5, -25),
+    #           (35, 10, 180), (30, -10, 160), (5, -12, 90)]
 
-    x, y, yaw, direct, pathx, pathy = generate_path(states)
+    x, y, yaw, direct, path_x, path_y = generate_path(states)
 
     # simulation
     maxTime = 100.0
     yaw_old = 0.0
     x0, y0, yaw0, direct0 = x[0][0], y[0][0], yaw[0][0], direct[0][0]
-    xrec, yrec = [], []
+    x_rec, y_rec = [], []
 
     for cx, cy, cyaw, cdirect in zip(x, y, yaw, direct):
         t = 0.0
@@ -211,31 +217,31 @@ def main():
         while t <= maxTime:
             if cdirect[0] > 0:
                 target_speed = 30.0 / 3.6
-                C.Ld = 3.5
-                C.dref = 1.5
+                C.Ld = 4.0
+                C.dist_stop = 1.5
                 C.dc = -1.1
             else:
                 target_speed = 20.0 / 3.6
                 C.Ld = 2.5
-                C.dref = 0.2
+                C.dist_stop = 0.2
                 C.dc = 0.2
 
             xt = node.x + C.dc * math.cos(node.yaw)
             yt = node.y + C.dc * math.sin(node.yaw)
             dist = math.hypot(xt - cx[-1], yt - cy[-1])
 
-            if dist < C.dref and target_ind == len(cx) - 1:
+            if dist < C.dist_stop:
                 break
 
-            accel = pid_control(target_speed, node.v, dist, cdirect[0])
+            acceleration = pid_control(target_speed, node.v, dist, cdirect[0])
             delta, target_ind = pure_pursuit(node, ref_trajectory, target_ind)
 
             t += C.dt
 
-            node.update(accel, delta, cdirect[0])
+            node.update(acceleration, delta, cdirect[0])
             nodes.add(t, node)
-            xrec.append(node.x)
-            yrec.append(node.y)
+            x_rec.append(node.x)
+            y_rec.append(node.y)
 
             dy = (node.yaw - yaw_old) / (node.v * C.dt)
             steer = rs.pi_2_pi(-math.atan(C.WB * dy))
@@ -246,16 +252,16 @@ def main():
             yaw0 = nodes.yaw[-1]
             direct0 = nodes.direct[-1]
 
-            # ainimation
+            # animation
             plt.cla()
             plt.plot(node.x, node.y, marker='.', color='k')
-            plt.plot(pathx, pathy, color='gray', linewidth=2)
-            plt.plot(xrec, yrec, color='darkviolet', linewidth=2)
+            plt.plot(path_x, path_y, color='gray', linewidth=2)
+            plt.plot(x_rec, y_rec, color='darkviolet', linewidth=2)
             plt.plot(cx[target_ind], cy[target_ind], ".r")
             draw.draw_car(node.x, node.y, yaw_old, steer, C)
 
             # for m in range(len(states)):
-            #     draw.Arrow(states[m][0], states[m][1], np.deg2rad(states[m][2]), 2, 'dimgray')
+            #     draw.Arrow(states[m][0], states[m][1], np.deg2rad(states[m][2]), 2, 'blue')
 
             plt.axis("equal")
             plt.title("PurePursuit: v=" + str(node.v * 3.6)[:4] + "km/h")
@@ -267,5 +273,4 @@ def main():
 
 
 if __name__ == '__main__':
-    C = P
     main()

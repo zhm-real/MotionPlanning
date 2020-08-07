@@ -434,7 +434,7 @@ def calc_rs_path_cost(rspath, yawt):
     for i in range(nctypes):
         if rspath.ctypes[i] == "R":
             ulist[i] = -C.MAX_STEER
-        elif rspath.ctypes[i] == "L":
+        elif rspath.ctypes[i] == "WB":
             ulist[i] = C.MAX_STEER
 
     for i in range(nctypes - 1):
