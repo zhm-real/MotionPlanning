@@ -31,6 +31,7 @@ class C:
     TR = 0.44  # [m] Tyre radius
     TW = 0.7  # [m] Tyre width
     MAX_STEER = 0.30
+    MAX_ACCELERATION = 5.0
 
 
 class Node:
@@ -42,11 +43,22 @@ class Node:
         self.direct = direct
 
     def update(self, a, delta, direct):
+        delta = self.limit_input(delta)
         self.x += self.v * math.cos(self.yaw) * C.dt
         self.y += self.v * math.sin(self.yaw) * C.dt
         self.yaw += self.v / C.WB * math.tan(delta) * C.dt
         self.direct = direct
         self.v += self.direct * a * C.dt
+
+    @staticmethod
+    def limit_input(delta):
+        if delta > C.MAX_STEER:
+            return C.MAX_STEER
+
+        if delta < -C.MAX_STEER:
+            return -C.MAX_STEER
+
+        return delta
 
 
 class Nodes:
@@ -114,7 +126,7 @@ def pure_pursuit(node, trajectory, index_old):
 
 def pid_control(target_v, v, dist, direct):
     """
-    design speed profile.
+    PID controller and design speed profile.
     :param target_v: target speed (forward and backward are different)
     :param v: current speed
     :param dist: distance from current position to end position

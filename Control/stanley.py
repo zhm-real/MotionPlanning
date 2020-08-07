@@ -13,11 +13,13 @@ import CurvesGenerator.cubic_spline as cs
 
 
 class C:
+    # PID config
     Kp = 1.0
+
+    # System config
     k = 0.5
     dt = 0.1
     dref = 0.5
-    max_steer = np.deg2rad(30.0)
 
     # vehicle config
     RF = 3.3  # [m] distance from rear to vehicle front end of vehicle
@@ -27,7 +29,7 @@ class C:
     WB = 2.5  # [m] Wheel base
     TR = 0.44  # [m] Tyre radius
     TW = 0.7  # [m] Tyre width
-    MAX_STEER = 0.25
+    MAX_STEER = 0.65
 
 
 class Node:
@@ -38,10 +40,21 @@ class Node:
         self.v = v
 
     def update(self, a, delta):
+        delta = self.limit_input(delta)
         self.x += self.v * math.cos(self.yaw) * C.dt
         self.y += self.v * math.sin(self.yaw) * C.dt
         self.yaw += self.v / C.WB * math.tan(delta) * C.dt
         self.v += a * C.dt
+
+    @staticmethod
+    def limit_input(delta):
+        if delta > C.MAX_STEER:
+            return C.MAX_STEER
+
+        if delta < -C.MAX_STEER:
+            return -C.MAX_STEER
+
+        return delta
 
 
 class Trajectory:
@@ -51,30 +64,34 @@ class Trajectory:
         self.cyaw = cyaw
         self.ind_old = 0
 
-    def target_index(self, node):
+    def calc_theta_e_and_ef(self, node):
         fx = node.x + C.WB * math.cos(node.yaw)
         fy = node.y + C.WB * math.sin(node.yaw)
 
         dx = [fx - x for x in self.cx]
         dy = [fy - y for y in self.cy]
-        target_index = np.argmin(np.hypot(dx, dy))
 
-        front_axle_vec = [-np.cos(node.yaw + np.pi / 2),
-                          -np.sin(node.yaw + np.pi / 2)]
-        error_front_axle = np.dot([dx[target_index], dy[target_index]], front_axle_vec)
+        target_index = int(np.argmin(np.hypot(dx, dy)))
+        target_index = max(self.ind_old, target_index)
+        self.ind_old = max(self.ind_old, target_index)
 
-        return target_index, error_front_axle
+        front_axle_vec_rot_90 = np.array([[math.cos(node.yaw - math.pi / 2.0)],
+                                          [math.sin(node.yaw - math.pi / 2.0)]])
+
+        vec_target_2_front = np.array([[dx[target_index]],
+                                       [dy[target_index]]])
+
+        ef = np.dot(vec_target_2_front.T, front_axle_vec_rot_90)
+
+        theta = node.yaw
+        theta_p = self.cyaw[target_index]
+        theta_e = pi_2_pi(theta_p - theta)
+
+        return theta_e, ef, target_index
 
     def front_wheel_feedback_control(self, node):
-        target_index, ef = self.target_index(node)
-        if self.ind_old >= target_index:
-            target_index = self.ind_old
-        else:
-            self.ind_old = target_index
-
-        theta_e = pi_2_pi(self.cyaw[target_index] - node.yaw)
-        theta_d = math.atan2(C.k * ef, node.v)
-        delta = theta_e + theta_d
+        theta_e, ef, target_index = self.calc_theta_e_and_ef(node)
+        delta = theta_e + math.atan2(C.k * ef, node.v)
 
         return delta, target_index
 
@@ -89,14 +106,22 @@ def pi_2_pi(angle):
 
 
 def pid_control(target_v, v, dist):
-    a = 0.2 * (target_v - v)
-    if dist > 10.0:
-        a = 0.3 * (target_v - v)
-    else:
-        if v > 2:
-            a = -3.0
-        elif v < -2:
+    """
+    PID controller and design speed profile.
+    :param target_v: target speed
+    :param v: current speed
+    :param dist: distance to end point
+    :return: acceleration
+    """
+
+    a = 0.3 * (target_v - v)
+
+    if dist < 10.0:
+        if v > 3.0:
+            a = -2.5
+        elif v < -2.0:
             a = -1.0
+
     return a
 
 
@@ -146,7 +171,8 @@ def main():
         plt.axis("equal")
         plt.title("FrontWheelFeedback: v=" + str(node.v * 3.6)[:4] + "km/h")
         plt.gcf().canvas.mpl_connect('key_release_event',
-                                     lambda event: [exit(0) if event.key == 'escape' else None])
+                                     lambda event:
+                                     [exit(0) if event.key == 'escape' else None])
         plt.pause(0.001)
 
     plt.show()
@@ -154,5 +180,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
-
