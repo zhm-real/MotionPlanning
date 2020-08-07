@@ -70,6 +70,11 @@ This repository uses two models: simple car model and [car pulling trailers mode
 </table>
 </div>
 
+## Paper
+* [Overview: ](https://arxiv.org/pdf/1604.07446.pdf) A Survey of Motion Planning and Control Techniques for Self-driving Urban Vehicles
+* [Rear-Wheel Feedback Control: ](https://www.ri.cmu.edu/pub_files/2009/2/Automatic_Steering_Methods_for_Autonomous_Automobile_Path_Tracking.pdf) Automatic Steering Methods for Autonomous Automobile Path Tracking
+* [Stanley Control: ](http://ai.stanford.edu/~gabeh/papers/hoffmann_stanley_control07.pdf) Autonomous Automobile Trajectory Tracking for Off-Road Driving: Controller Design, Experimental Validation and Racing
+
 ## Useful Material
 * [ApolloAuto/apollo](https://github.com/ApolloAuto/apollo) by Baidu
 * [Optimal Trajectory Generation for Dynamic Street Scenarios in a Frenet Frame](https://www.researchgate.net/publication/224156269_Optimal_Trajectory_Generation_for_Dynamic_Street_Scenarios_in_a_Frenet_Frame) by Moritz Werling, etc
