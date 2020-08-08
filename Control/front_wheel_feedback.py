@@ -65,6 +65,15 @@ class Trajectory:
         self.ind_old = 0
 
     def calc_theta_e_and_ef(self, node):
+        """
+        calc theta_e and ef.
+        theta_e = theta_car - theta_path
+        ef = lateral distance in frenet frame (front wheel)
+
+        :param node: current information of vehicle
+        :return: theta_e and ef
+        """
+
         fx = node.x + C.WB * math.cos(node.yaw)
         fy = node.y + C.WB * math.sin(node.yaw)
 
@@ -89,11 +98,19 @@ class Trajectory:
 
         return theta_e, ef, target_index
 
-    def front_wheel_feedback_control(self, node):
-        theta_e, ef, target_index = self.calc_theta_e_and_ef(node)
-        delta = theta_e + math.atan2(C.k * ef, node.v)
 
-        return delta, target_index
+def front_wheel_feedback_control(node, ref_path):
+    """
+    front wheel feedback controller
+    :param node: current information
+    :param ref_path: reference path: x, y, yaw, curvature
+    :return: optimal steering angle
+    """
+
+    theta_e, ef, target_index = ref_path.calc_theta_e_and_ef(node)
+    delta = theta_e + math.atan2(C.k * ef, node.v)
+
+    return delta, target_index
 
 
 def pi_2_pi(angle):
@@ -139,13 +156,13 @@ def main():
     xrec, yrec, yawrec = [], [], []
 
     node = Node(x=x0, y=y0, yaw=yaw0, v=0.0)
-    ref_trajectory = Trajectory(cx, cy, cyaw)
+    ref_path = Trajectory(cx, cy, cyaw)
 
     while t < maxTime:
         speed_ref = 25.0 / 3.6
         C.Ld = 3.5
 
-        di, target_index = ref_trajectory.front_wheel_feedback_control(node)
+        di, target_index = front_wheel_feedback_control(node, ref_path)
 
         dist = math.hypot(node.x - cx[-1], node.y - cy[-1])
         ai = pid_control(speed_ref, node.v, dist)

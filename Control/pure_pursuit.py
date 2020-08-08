@@ -79,7 +79,7 @@ class Nodes:
         self.direct.append(node.direct)
 
 
-class Trajectory:
+class PATH:
     def __init__(self, cx, cy):
         self.cx = cx
         self.cy = cy
@@ -87,6 +87,13 @@ class Trajectory:
         self.index_old = None
 
     def target_index(self, node):
+        """
+        search index of target point in the reference path.
+        the distance between target point and current position is ld
+        :param node: current information
+        :return: index of target point
+        """
+
         if self.index_old is None:
             self.calc_nearest_ind(node)
 
@@ -102,6 +109,12 @@ class Trajectory:
         return self.ind_end, Lf
 
     def calc_nearest_ind(self, node):
+        """
+        calc index of the nearest point to current position
+        :param node: current information
+        :return: index of nearest point
+        """
+
         dx = [node.x - x for x in self.cx]
         dy = [node.y - y for y in self.cy]
         ind = np.argmin(np.hypot(dx, dy))
@@ -111,12 +124,20 @@ class Trajectory:
         return math.hypot(node.x - self.cx[ind], node.y - self.cy[ind])
 
 
-def pure_pursuit(node, trajectory, index_old):
-    ind, Lf = trajectory.target_index(node)  # target point and pursuit distance
+def pure_pursuit(node, ref_path, index_old):
+    """
+    pure pursuit controller
+    :param node: current information
+    :param ref_path: reference path: x, y, yaw, curvature
+    :param index_old: target index of last time
+    :return: optimal steering angle
+    """
+
+    ind, Lf = ref_path.target_index(node)  # target point and pursuit distance
     ind = max(ind, index_old)
 
-    tx = trajectory.cx[ind]
-    ty = trajectory.cy[ind]
+    tx = ref_path.cx[ind]
+    ty = ref_path.cy[ind]
 
     alpha = math.atan2(ty - node.y, tx - node.x) - node.yaw
     delta = math.atan2(2.0 * C.WB * math.sin(alpha), Lf)
@@ -223,7 +244,7 @@ def main():
         node = Node(x=x0, y=y0, yaw=yaw0, v=0.0, direct=direct0)
         nodes = Nodes()
         nodes.add(t, node)
-        ref_trajectory = Trajectory(cx, cy)
+        ref_trajectory = PATH(cx, cy)
         target_ind, _ = ref_trajectory.target_index(node)
 
         while t <= maxTime:

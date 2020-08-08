@@ -16,10 +16,10 @@ class C:
     Kp = 1.0
 
     # System config
-    K_theta = 1.0
-    K_e = 0.5
     dt = 0.1
-    dist_stop = 0.2
+    dist_stop = 0.5
+    Q = np.eye(4)
+    R = np.eye(1)
 
     # vehicle config
     RF = 3.3  # [m] distance from rear to vehicle front end of vehicle
@@ -29,7 +29,7 @@ class C:
     WB = 2.5  # [m] Wheel base
     TR = 0.44  # [m] Tyre radius
     TW = 0.7  # [m] Tyre width
-    MAX_STEER = 0.25
+    MAX_STEER = 0.30
 
 
 class Node:
@@ -41,21 +41,32 @@ class Node:
         self.direct = direct
 
     def update(self, a, delta, direct):
+        # delta = self.limit_input(delta)
         self.x += self.v * math.cos(self.yaw) * C.dt
         self.y += self.v * math.sin(self.yaw) * C.dt
         self.yaw += self.v / C.WB * math.tan(delta) * C.dt
         self.direct = direct
         self.v += self.direct * a * C.dt
 
+    @staticmethod
+    def limit_input(delta):
+        if delta >= C.MAX_STEER:
+            return C.MAX_STEER
+
+        if delta <= -C.MAX_STEER:
+            return -C.MAX_STEER
+
+        return delta
+
 
 class PATH:
-    def __init__(self, cx, cy, cyaw, ccurv):
+    def __init__(self, cx, cy, cyaw, ck):
         self.cx = cx
         self.cy = cy
         self.cyaw = cyaw
-        self.ccurv = ccurv
+        self.ck = ck
+        self.ind_old = 0
         self.len = len(self.cx)
-        self.s0 = 1
 
     def calc_theta_e_and_er(self, node):
         """
@@ -67,66 +78,112 @@ class PATH:
         :return: theta_e and er
         """
 
-        ind = self.nearest_index(node)
-
-        k = self.ccurv[ind]
-        yaw = self.cyaw[ind]
+        dx = [node.x - x for x in self.cx]
+        dy = [node.y - y for y in self.cy]
+        ind = int(np.argmin(np.hypot(dx, dy)))
 
         rear_axle_vec_rot_90 = np.array([[math.cos(node.yaw + math.pi / 2.0)],
                                          [math.sin(node.yaw + math.pi / 2.0)]])
 
-        vec_target_2_rear = np.array([[node.x - self.cx[ind]],
-                                      [node.y - self.cy[ind]]])
+        vec_target_2_rear = np.array([[dx[ind]],
+                                      [dy[ind]]])
 
         er = np.dot(vec_target_2_rear.T, rear_axle_vec_rot_90)
-        theta_e = pi_2_pi(node.yaw - self.cyaw[ind])
+        er = er[0][0]
 
-        return theta_e, er, k, yaw, ind
+        theta = node.yaw
+        theta_p = self.cyaw[ind]
+        theta_e = pi_2_pi(theta - theta_p)
 
-    def nearest_index(self, node):
-        """
-        find the index of the nearest point to current position.
-        :param node: current information
-        :return: nearest index
-        """
+        k = self.ck[ind]
 
-        dx = [node.x - x for x in self.cx]
-        dy = [node.y - y for y in self.cy]
-        dist = np.hypot(dx, dy)
-        self.s0 += np.argmin(dist[self.s0:self.len])
-
-        return self.s0
+        return theta_e, er, k, ind
 
 
-def rear_wheel_feedback_control(node, ref_path):
+def lqr_lateral_control(node, er_old, theta_e_old, ref_path):
     """
-    rear wheel feedback controller
-    :param node: current information
+    using lqr controller calc optimal steering angle of vehicle.
+    model:
+        x[k+1] = A x[k] + B u[k]
+        cost = sum x[k].T*Q*x[k] + u[k].T*R*u[k]
+    state vector:
+        x[k] = [er[k] (er[k] - er[k-1])/dt theta_e[k] (theta_e[k] - theta_e[k-1])/dt].T
+    input vector:
+        u[k] = [delta[k]]
+
+    :param node: current information of vehicle
+    :param er_old: lateral position of last time
+    :param theta_e_old: theta error of last time
     :param ref_path: reference path: x, y, yaw, curvature
-    :return: optimal steering angle
+    :return: optimal input delta_optimal = delta_feedback + delta_feedforward
     """
 
-    theta_e, er, k, yaw, ind = ref_path.calc_theta_e_and_er(node)
-    vr = node.v
+    theta_e, er, k, ind = ref_path.calc_theta_e_and_er(node)
+    A, B = calc_linearized_discrete_model(node.v)
+    Q = C.Q
+    R = C.R
+    P = solve_riccati_equation(A, B, Q, R)
+    K = np.linalg.inv(B.T @ P @ B + R) @ (B.T @ P @ A)
+    X = np.array([[er],
+                  [(er - er_old) / C.dt],
+                  [theta_e],
+                  [(theta_e - theta_e_old) / C.dt]])
+    delta_fb = -K @ X
+    delta_ff = math.atan(C.WB * k)
+    delta = delta_ff + delta_fb
 
-    omega = vr * k * math.cos(theta_e) / (1.0 - k * er) - \
-            C.K_theta * abs(vr) * theta_e - C.K_e * vr * math.sin(theta_e) * er / theta_e
-
-    delta = math.atan2(C.WB * omega, vr)
-
-    return delta, ind
-
-
-def pi_2_pi(angle):
-    if angle > math.pi:
-        return angle - 2.0 * math.pi
-    if angle < -math.pi:
-        return angle + 2.0 * math.pi
-
-    return angle
+    return delta, er, theta_e, ind
 
 
-def pid_control(target_v, v, dist, direct):
+def solve_riccati_equation(A, B, Q, R):
+    """
+    solve a discrete-time algebraic riccati equation.
+    Course Optimal Control verified that value iteration could solve raccati equation.
+    :param A: state-space equation A
+    :param B: state-space equation B
+    :param Q: penalty on state vector x
+    :param R: penalty on input vector u
+    :return: P: d(x.TPx)/dt = -x.T(Q+K.TRK)x
+    """
+
+    P = Q
+    P_next = Q
+    iter_max = 150
+    eps = 0.01
+
+    for k in range(iter_max):
+        P_next = A.T @ P @ A - A.T @ P @ B @ \
+                 np.linalg.inv(R + B.T @ P @ B) @ B.T @ P @ A + Q
+
+        if (abs(P_next - P)).max() < eps:
+            break
+
+        P = P_next
+
+    return P_next
+
+
+def calc_linearized_discrete_model(v):
+    """
+    kinematic model -> linear system -> discrete-time linear system
+    :param v: current velocity
+    :return: state-space equation: A and B
+    """
+
+    A = np.array([[1.0, C.dt, 0.0, 0.0],
+                  [0.0, 0.0, v, 0.0],
+                  [0.0, 0.0, 1.0, C.dt],
+                  [0.0, 0.0, 0.0, 0.0]])
+
+    B = np.array([[0.0],
+                  [0.0],
+                  [0.0],
+                  [v / C.WB]])
+
+    return A, B
+
+
+def pid_longitudinal_control(target_v, v, dist, direct):
     """
     using LQR as lateral controller, PID as longitudinal controller (speed control)
     :param target_v: target speed
@@ -145,6 +202,15 @@ def pid_control(target_v, v, dist, direct):
             a = -1.0
 
     return a
+
+
+def pi_2_pi(angle):
+    if angle > math.pi:
+        return angle - 2.0 * math.pi
+    if angle < -math.pi:
+        return angle + 2.0 * math.pi
+
+    return angle
 
 
 def generate_path(s):
@@ -227,22 +293,22 @@ def main():
 
     for cx, cy, cyaw, cdirect, ccurv in zip(x_ref, y_ref, yaw_ref, direct, curv):
         t = 0.0
+        er, theta_e = 0.0, 0.0
+
         node = Node(x=x0, y=y0, yaw=yaw0, v=0.0, direct=cdirect[0])
-        ref_trajectory = PATH(cx, cy, cyaw, ccurv)
+        ref_path = PATH(cx, cy, cyaw, ccurv)
 
         while t < maxTime:
             if cdirect[0] > 0:
                 speed_ref = 30.0 / 3.6
-                C.Ld = 3.5
             else:
-                speed_ref = 15.0 / 3.6
-                C.Ld = 2.5
+                speed_ref = 20.0 / 3.6
 
-            delta, ind = rear_wheel_feedback_control(node, ref_trajectory)
+            delta, er, theta_e, ind = lqr_lateral_control(node, er, theta_e, ref_path)
 
             dist = math.hypot(node.x - cx[-1], node.y - cy[-1])
 
-            acceleration = pid_control(speed_ref, node.v, dist, node.direct)
+            acceleration = pid_longitudinal_control(speed_ref, node.v, dist, node.direct)
             node.update(acceleration, delta, node.direct)
             t += C.dt
 
@@ -268,7 +334,7 @@ def main():
             plt.plot(cx[ind], cy[ind], '.r')
             draw.draw_car(node.x, node.y, node.yaw, steer, C)
             plt.axis("equal")
-            plt.title("RearWheelFeedback: v=" + str(node.v * 3.6)[:4] + "km/h")
+            plt.title("lqr: v=" + str(node.v * 3.6)[:4] + "km/h")
             plt.gcf().canvas.mpl_connect('key_release_event',
                                          lambda event:
                                          [exit(0) if event.key == 'escape' else None])
