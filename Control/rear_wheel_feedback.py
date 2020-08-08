@@ -12,11 +12,14 @@ import CurvesGenerator.reeds_shepp as rs
 
 
 class C:
+    # PID config
     Kp = 1.0
-    KTH = 1.0
-    KE = 0.5
+
+    # System config
+    K_theta = 1.0
+    K_e = 0.5
     dt = 0.1
-    dref = 0.2
+    dist_stop = 0.2
 
     # vehicle config
     RF = 3.3  # [m] distance from rear to vehicle front end of vehicle
@@ -55,28 +58,41 @@ class Trajectory:
         self.s0 = 1
 
     def calc_track_error(self, node):
-        s = self.nearest_point(node)
+        ind = self.nearest_index(node)
 
-        k = self.ccurv[s]
-        yaw = self.cyaw[s]
+        k = self.ccurv[ind]
+        yaw = self.cyaw[ind]
 
-        dxl = node.x - self.cx[s]
-        dyl = node.y - self.cy[s]
-        angle = pi_2_pi(math.atan2(dyl, dxl) - yaw)
-        e = math.hypot(dxl, dyl) * math.sin(abs(angle))
+        rear_axle_vec_rot_90 = np.array([[math.cos(node.yaw + math.pi / 2.0)],
+                                         [math.sin(node.yaw + math.pi / 2.0)]])
 
-        if angle < 0:
-            e *= -1
+        vec_target_2_rear = np.array([[node.x - self.cx[ind]],
+                                      [node.y - self.cy[ind]]])
 
-        return e, k, yaw, s
+        er = np.dot(vec_target_2_rear.T, rear_axle_vec_rot_90)
 
-    def nearest_point(self, node):
+        return er, k, yaw, ind
+
+    def nearest_index(self, node):
         dx = [node.x - x for x in self.cx]
         dy = [node.y - y for y in self.cy]
         dist = np.hypot(dx, dy)
         self.s0 += np.argmin(dist[self.s0:self.len])
 
         return self.s0
+
+
+def rear_wheel_feedback_control(node, ref_trajectory):
+    er, k, yaw, ind = ref_trajectory.calc_track_error(node)
+    theta_e = pi_2_pi(node.yaw - ref_trajectory.cyaw[ind])
+    vr = node.v
+
+    omega = vr * k * math.cos(theta_e) / (1.0 - k * er) - \
+            C.K_theta * abs(vr) * theta_e - C.K_e * vr * math.sin(theta_e) * er / theta_e
+
+    delta = math.atan2(C.WB * omega, vr)
+
+    return delta, ind
 
 
 def pi_2_pi(angle):
@@ -104,7 +120,7 @@ def generate_path(s):
     max_c = math.tan(C.MAX_STEER) / C.WB
     path_x, path_y, yaw, direct, rc = [], [], [], [], []
     x_rec, y_rec, yaw_rec, direct_rec, rc_rec = [], [], [], [], []
-    direc_flag = 1.0
+    direct_flag = 1.0
 
     for i in range(len(s) - 1):
         s_x, s_y, s_yaw = s[i][0], s[i][1], np.deg2rad(s[i][2])
@@ -121,15 +137,15 @@ def generate_path(s):
         idirect = path_i.directions
 
         for j in range(len(ix)):
-            if idirect[j] == direc_flag:
+            if idirect[j] == direct_flag:
                 x_rec.append(ix[j])
                 y_rec.append(iy[j])
                 yaw_rec.append(iyaw[j])
                 direct_rec.append(idirect[j])
                 rc_rec.append(irc[j])
             else:
-                if len(x_rec) == 0 or direct_rec[0] != direc_flag:
-                    direc_flag = idirect[j]
+                if len(x_rec) == 0 or direct_rec[0] != direct_flag:
+                    direct_flag = idirect[j]
                     continue
 
                 path_x.append(x_rec)
@@ -154,21 +170,6 @@ def generate_path(s):
     return path_x, path_y, yaw, direct, rc, x_all, y_all
 
 
-def rear_wheel_feedback_control(state, e, k, yaw_ref):
-    v = state.v
-    th_e = pi_2_pi(state.yaw - yaw_ref)
-
-    omega = v * k * math.cos(th_e) / (1.0 - k * e) - \
-            C.KTH * abs(v) * th_e - C.KE * v * math.sin(th_e) * e / th_e
-
-    if th_e == 0.0 or omega == 0.0:
-        return 0.0
-
-    delta = math.atan2(C.WB * omega / v, 1.0)
-
-    return delta
-
-
 def main():
     # generate path
     states = [(0, 0, 0), (20, 15, 0), (35, 20, 90), (40, 0, 180),
@@ -190,26 +191,24 @@ def main():
         t = 0.0
         node = Node(x=x0, y=y0, yaw=yaw0, v=0.0, direct=cdirect[0])
         ref_trajectory = Trajectory(cx, cy, cyaw, ccurv)
-        speed_ref = 30 / 3.6
 
         while t < maxTime:
             if cdirect[0] > 0:
                 speed_ref = 30.0 / 3.6
                 C.Ld = 3.5
             else:
-                speed_ref = 20.0 / 3.6
+                speed_ref = 15.0 / 3.6
                 C.Ld = 2.5
 
-            e, k, yawref, s0 = ref_trajectory.calc_track_error(node)
-            di = rear_wheel_feedback_control(node, e, k, yawref)
+            delta, ind = rear_wheel_feedback_control(node, ref_trajectory)
 
             dist = math.hypot(node.x - cx[-1], node.y - cy[-1])
 
-            ai = pid_control(speed_ref, node.v, dist, node.direct)
-            node.update(ai, di, node.direct)
+            acceleration = pid_control(speed_ref, node.v, dist, node.direct)
+            node.update(acceleration, delta, node.direct)
             t += C.dt
 
-            if dist <= C.dref:
+            if dist <= C.dist_stop:
                 break
 
             x_rec.append(node.x)
@@ -228,12 +227,13 @@ def main():
             plt.cla()
             plt.plot(x_all, y_all, color='gray', linewidth=2.0)
             plt.plot(x_rec, y_rec, linewidth=2.0, color='darkviolet')
-            plt.plot(cx[s0], cy[s0], '.r')
+            plt.plot(cx[ind], cy[ind], '.r')
             draw.draw_car(node.x, node.y, node.yaw, steer, C)
             plt.axis("equal")
             plt.title("RearWheelFeedback: v=" + str(node.v * 3.6)[:4] + "km/h")
             plt.gcf().canvas.mpl_connect('key_release_event',
-                                         lambda event: [exit(0) if event.key == 'escape' else None])
+                                         lambda event:
+                                         [exit(0) if event.key == 'escape' else None])
             plt.pause(0.001)
 
     plt.show()

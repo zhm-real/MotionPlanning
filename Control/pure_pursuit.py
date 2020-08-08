@@ -278,7 +278,8 @@ def main():
             plt.axis("equal")
             plt.title("PurePursuit: v=" + str(node.v * 3.6)[:4] + "km/h")
             plt.gcf().canvas.mpl_connect('key_release_event',
-                                         lambda event: [exit(0) if event.key == 'escape' else None])
+                                         lambda event:
+                                         [exit(0) if event.key == 'escape' else None])
             plt.pause(0.001)
 
     plt.show()
