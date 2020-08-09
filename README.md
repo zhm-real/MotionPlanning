@@ -1,16 +1,16 @@
 # Motion Planner
 ## Overview
 This repository implemented some common motion planners used on autonomous vehicles, including
-* [Hybrid A* Planner](https://blog.habrador.com/2015/11/explaining-hybrid-star-pathfinding.html)
-* [Lattice Planner](https://www.researchgate.net/publication/224156269_Optimal_Trajectory_Generation_for_Dynamic_Street_Scenarios_in_a_Frenet_Frame)
-* [EM Planner](https://arxiv.org/abs/1807.08048) (imcompleted)
+* [Hybrid A* Planner: ](https://ai.stanford.edu/~ddolgov/papers/dolgov_gpp_stair08.pdf) Practical Search Techniques in Path Planning for Autonomous Driving
+* [Frenet Optimal Trajectory: ](https://www.researchgate.net/publication/224156269_Optimal_Trajectory_Generation_for_Dynamic_Street_Scenarios_in_a_Frenet_Frame) Optimal Trajectory Generation for Dynamic Street Scenarios in a Frenet Frame
+* [EM Planner: ](https://arxiv.org/abs/1807.08048) Baidu Apollo EM Motion Planner (Imcomplete)
 
 Also, this repository provides some controllers for path tracking, including
-* [Pure Pursuit + PID](https://www.ri.cmu.edu/pub_files/pub3/coulter_r_craig_1992_1/coulter_r_craig_1992_1.pdf)
-* [Rear-Wheel Feedback + PID](https://www.ri.cmu.edu/pub_files/2009/2/Automatic_Steering_Methods_for_Autonomous_Automobile_Path_Tracking.pdf)
-* [Front-Wheel Feedback / Stanley + PID](http://robots.stanford.edu/papers/thrun.stanley05.pdf)
-* [LQR + PID](https://github.com/ApolloAuto/apollo/tree/master/modules/control/controller)
-* [Linear MPC](http://www.mpc.berkeley.edu/mpc-course-material)
+* [Pure Pursuit + PID: ](https://www.ri.cmu.edu/pub_files/pub3/coulter_r_craig_1992_1/coulter_r_craig_1992_1.pdf) Implementation of the Pure Pursuit Path Tracking Algorithm 
+* [Rear-Wheel Feedback + PID: ](https://www.ri.cmu.edu/pub_files/2009/2/Automatic_Steering_Methods_for_Autonomous_Automobile_Path_Tracking.pdf) Automatic Steering Methods for Autonomous Automobile Path Tracking
+* [Front-Wheel Feedback / Stanley + PID: ](http://robots.stanford.edu/papers/thrun.stanley05.pdf) Stanley: The Robot that Won the DARPA Grand Challenge
+* [LQR + PID: ](https://github.com/ApolloAuto/apollo/tree/master/modules/control/controller) ApolloAuto/apollo: An open autonomous driving platform
+* [Linear MPC: ](https://borrelli.me.berkeley.edu/pdfpub/pub-6.pdf) MPC-Based Approach to Active Steering for Autonomous Vehicle Systems
 
 ## Requirement
 * Python 3.6 or above
