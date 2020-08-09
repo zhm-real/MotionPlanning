@@ -27,7 +27,7 @@ class P:
     # MPC config
     Q = np.diag([1.0, 1.0, 0.5, 0.5])  # penalty for states
     Qf = np.diag([1.0, 1.0, 0.5, 0.5])  # penalty for end state
-    R = np.diag([0.01, 0.01])  # penalty for inputs
+    R = np.diag([0.01, 0.1])  # penalty for inputs
     Rd = np.diag([0.01, 1.0])  # penalty for change of inputs
 
     dist_stop = 1.5  # stop permitted when dist to goal < dist_stop
@@ -37,6 +37,7 @@ class P:
     target_speed = 10.0 / 3.6  # target speed
     N_IND = 10  # search index number
     dt = 0.2  # time step
+    d_dist = 1.0  # dist step
     du_res = 0.1  # threshold for stopping iteration
 
     # vehicle config
@@ -106,29 +107,86 @@ class PATH:
         dx = [node.x - x for x in self.cx[self.ind_old: (self.ind_old + P.N_IND)]]
         dy = [node.y - y for y in self.cy[self.ind_old: (self.ind_old + P.N_IND)]]
         dist = np.hypot(dx, dy)
-        ind = int(np.argmin(dist))
-        dist_min = dist[ind]
-        ind += self.ind_old
+
+        ind_in_N = int(np.argmin(dist))
+        ind = self.ind_old + ind_in_N
         self.ind_old = ind
 
-        dxl = self.cx[ind] - node.x
-        dyl = self.cy[ind] - node.y
-        angle = pi_2_pi(self.cyaw[ind] - math.atan2(dyl, dxl))
+        rear_axle_vec_rot_90 = np.array([[math.cos(node.yaw + math.pi / 2.0)],
+                                         [math.sin(node.yaw + math.pi / 2.0)]])
 
-        if angle < 0.0:
-            dist_min *= -1.0
+        vec_target_2_rear = np.array([[dx[ind_in_N]],
+                                      [dy[ind_in_N]]])
 
-        return ind, dist_min
+        er = np.dot(vec_target_2_rear.T, rear_axle_vec_rot_90)
+        er = er[0][0]
+
+        return ind, er
 
 
-def pi_2_pi(angle):
-    if angle > math.pi:
-        return angle - 2.0 * math.pi
+def calc_ref_trajectory_in_T_step(node, ref_path, sp):
+    z_ref = np.zeros((P.NX, P.T + 1))
+    length = ref_path.length
 
-    if angle < -math.pi:
-        return angle + 2.0 * math.pi
+    ind, _ = ref_path.nearest_index(node)
 
-    return angle
+    z_ref[0, 0] = ref_path.cx[ind]
+    z_ref[1, 0] = ref_path.cy[ind]
+    z_ref[2, 0] = sp[ind]
+    z_ref[3, 0] = ref_path.cyaw[ind]
+
+    dist_move = 0.0
+
+    for i in range(P.T + 1):
+        dist_move += abs(node.v) * P.dt
+        ind_move = int(round(dist_move / P.d_dist))
+        index = min(ind + ind_move, length - 1)
+
+        z_ref[0, i] = ref_path.cx[index]
+        z_ref[1, i] = ref_path.cy[index]
+        z_ref[2, i] = sp[index]
+        z_ref[3, i] = ref_path.cyaw[index]
+
+    return z_ref, ind
+
+
+def linear_mpc_control(z_ref, z0, a_old, delta_old):
+    if a_old is None or delta_old is None:
+        a_old = [0.0] * P.T
+        delta_old = [0.0] * P.T
+
+    x, y, yaw, v = None, None, None, None
+
+    for k in range(P.iter_max):
+        z_bar = predict_states_in_T_step(z0, a_old, delta_old, z_ref)
+        a_rec, delta_rec = a_old[:], delta_old[:]
+        a_old, delta_old, x, y, yaw, v = solve_linear_mpc(z_ref, z_bar, z0, delta_old)
+
+        du_a_max = max([abs(ia - iao) for ia, iao in zip(a_old, a_rec)])
+        du_d_max = max([abs(ide - ido) for ide, ido in zip(delta_old, delta_rec)])
+
+        if max(du_a_max, du_d_max) < P.du_res:
+            break
+
+    return a_old, delta_old, x, y, yaw, v
+
+
+def predict_states_in_T_step(z0, a, delta, z_ref):
+    z_bar = z_ref * 0.0
+
+    for i in range(P.NX):
+        z_bar[i, 0] = z0[i]
+
+    node = Node(x=z0[0], y=z0[1], v=z0[2], yaw=z0[3])
+
+    for ai, di, i in zip(a, delta, range(1, P.T + 1)):
+        node.update(ai, di, 1.0)
+        z_bar[0, i] = node.x
+        z_bar[1, i] = node.y
+        z_bar[2, i] = node.v
+        z_bar[3, i] = node.yaw
+
+    return z_bar
 
 
 def calc_linear_discrete_model(v, phi, delta):
@@ -148,6 +206,52 @@ def calc_linear_discrete_model(v, phi, delta):
                   -P.dt * v * delta / (P.WB * math.cos(delta) ** 2)])
 
     return A, B, C
+
+
+def solve_linear_mpc(z_ref, z_bar, z0, d_bar):
+    z = cvxpy.Variable((P.NX, P.T + 1))
+    u = cvxpy.Variable((P.NU, P.T))
+
+    cost = 0.0
+    constrains = []
+
+    for t in range(P.T):
+        cost += cvxpy.quad_form(u[:, t], P.R)
+        cost += cvxpy.quad_form(z_ref[:, t] - z[:, t], P.Q)
+
+        A, B, C = calc_linear_discrete_model(z_bar[2, t], z_bar[3, t], d_bar[t])
+
+        constrains += [z[:, t + 1] == A @ z[:, t] + B @ u[:, t] + C]
+
+        if t < P.T - 1:
+            cost += cvxpy.quad_form(u[:, t + 1] - u[:, t], P.Rd)
+            constrains += [cvxpy.abs(u[1, t + 1] - u[1, t]) <= P.steer_change_max * P.dt]
+
+    cost += cvxpy.quad_form(z_ref[:, P.T] - z[:, P.T], P.Qf)
+
+    constrains += [z[:, 0] == z0]
+    constrains += [z[2, :] <= P.speed_max]
+    constrains += [z[2, :] >= P.speed_min]
+    constrains += [cvxpy.abs(u[0, :]) <= P.acceleration_max]
+    constrains += [cvxpy.abs(u[1, :]) <= P.steer_max]
+
+    prob = cvxpy.Problem(cvxpy.Minimize(cost), constrains)
+    prob.solve(solver=cvxpy.OSQP)
+
+    a, delta, x, y, yaw, v = None, None, None, None, None, None
+
+    if prob.status == cvxpy.OPTIMAL or \
+            prob.status == cvxpy.OPTIMAL_INACCURATE:
+        x = z.value[0, :]
+        y = z.value[1, :]
+        v = z.value[2, :]
+        yaw = z.value[3, :]
+        a = u.value[0, :]
+        delta = u.value[1, :]
+    else:
+        print("Cannot solve linear mpc!")
+
+    return a, delta, x, y, yaw, v
 
 
 def calc_speed_profile(cx, cy, cyaw, target_speed):
@@ -178,123 +282,22 @@ def calc_speed_profile(cx, cy, cyaw, target_speed):
     return speed_profile
 
 
-def calc_optimal_trajectory_in_T_step(node, ref_path, sp, dl):
-    z_opt = np.zeros((P.NX, P.T + 1))
-    d_opt = np.zeros((1, P.T + 1))
-    length = ref_path.length
+def pi_2_pi(angle):
+    if angle > math.pi:
+        return angle - 2.0 * math.pi
 
-    ind, _ = ref_path.nearest_index(node)
+    if angle < -math.pi:
+        return angle + 2.0 * math.pi
 
-    z_opt[0, 0] = ref_path.cx[ind]
-    z_opt[1, 0] = ref_path.cy[ind]
-    z_opt[2, 0] = sp[ind]
-    z_opt[3, 0] = ref_path.cyaw[ind]
-    d_opt[0, 0] = 0.0
-
-    travel = 0.0
-
-    for i in range(P.T + 1):
-        travel += abs(node.v) * P.dt
-        dind = int(round(travel / dl))
-        index = min(ind + dind, length - 1)
-
-        z_opt[0, i] = ref_path.cx[index]
-        z_opt[1, i] = ref_path.cy[index]
-        z_opt[2, i] = sp[index]
-        z_opt[3, i] = ref_path.cyaw[index]
-        d_opt[0, i] = 0.0
-
-    return z_opt, ind, d_opt
-
-
-def predict_model(z0, a, delta, z_opt):
-    z_bar = z_opt * 0.0
-
-    for i, _ in enumerate(z0):
-        z_bar[i, 0] = z0[i]
-
-    node = Node(x=z0[0], y=z0[1], v=z0[2], yaw=z0[3])
-
-    for ai, di, i in zip(a, delta, range(1, P.T + 1)):
-        node.update(ai, di, 1.0)
-        z_bar[0, i] = node.x
-        z_bar[1, i] = node.y
-        z_bar[2, i] = node.v
-        z_bar[3, i] = node.yaw
-
-    return z_bar
-
-
-def linear_mpc_control(z_opt, z0, d_opt, oa, od):
-    if oa is None or od is None:
-        oa = [0.0] * P.T
-        od = [0.0] * P.T
-
-    for i in range(P.iter_max):
-        z_bar = predict_model(z0, oa, od, z_opt)
-        poa, pod = oa[:], od[:]
-        oa, od, ox, oy, oyaw, ov = solve_linear_mpc(z_opt, z_bar, z0, d_opt)
-        du = sum(abs(oa - poa)) + sum(abs(od - pod))  # calc u change value
-
-        if du <= P.du_res:
-            break
-    else:
-        print("Iterative is max iter")
-
-    return oa, od, ox, oy, oyaw, ov
-
-
-def solve_linear_mpc(z_opt, z_bar, z0, d_opt):
-    z = cvxpy.Variable((P.NX, P.T + 1))
-    u = cvxpy.Variable((P.NU, P.T))
-
-    cost = 0.0
-    constrains = []
-
-    for t in range(P.T):
-        cost += cvxpy.quad_form(u[:, t], P.R)
-
-        if t != 0:
-            cost += cvxpy.quad_form(z_opt[:, t] - z[:, t], P.Q)
-
-        A, B, C = calc_linear_discrete_model(z_bar[2, t], z_bar[3, t], d_opt[0, t])
-
-        constrains += [z[:, t + 1] == A * z[:, t] + B * u[:, t] + C]
-
-        if t < P.T - 1:
-            cost += cvxpy.quad_form(u[:, t + 1] - u[:, t], P.Rd)
-            constrains += [cvxpy.abs(u[1, t + 1] - u[1, t]) <= P.steer_change_max * P.dt]
-
-    cost += cvxpy.quad_form(z_opt[:, P.T] - z[:, P.T], P.Qf)
-
-    constrains += [z[:, 0] == z0]
-    constrains += [z[2, :] <= P.speed_max]
-    constrains += [z[2, :] >= P.speed_min]
-    constrains += [cvxpy.abs(u[0, :]) <= P.acceleration_max]
-    constrains += [cvxpy.abs(u[1, :]) <= P.steer_max]
-
-    prob = cvxpy.Problem(cvxpy.Minimize(cost), constrains)
-    prob.solve(solver=cvxpy.OSQP, verbose=False)
-
-    if prob.status == cvxpy.OPTIMAL or \
-            prob.status == cvxpy.OPTIMAL_INACCURATE:
-        ox = z.value[0, :].flatten()
-        oy = z.value[1, :].flatten()
-        ov = z.value[2, :].flatten()
-        oyaw = z.value[3, :].flatten()
-        oa = u.value[0, :].flatten()
-        odelta = u.value[1, :].flatten()
-    else:
-        print("Cannot solve linear mpc")
-        oa, odelta, ox, oy, oyaw, ov = None, None, None, None, None, None
-
-    return oa, odelta, ox, oy, oyaw, ov
+    return angle
 
 
 def main():
     ax = [0.0, 20.0, 40.0, 55.0, 70.0, 85.0]
     ay = [0.0, 50.0, 20.0, 35.0, 0.0, 10.0]
-    cx, cy, cyaw, ck, s = cs.calc_spline_course(ax, ay, ds=1.0)
+    cx, cy, cyaw, ck, s = cs.calc_spline_course(
+        ax, ay, ds=P.d_dist)
+
     sp = calc_speed_profile(cx, cy, cyaw, P.target_speed)
 
     ref_path = PATH(cx, cy, cyaw, ck)
@@ -309,23 +312,22 @@ def main():
     d = [0.0]
     a = [0.0]
 
-    target_ind, _ = ref_path.nearest_index(node)
-
-    odelta, oa = None, None
+    delta_opt, a_opt = None, None
+    a_exc, delta_exc = 0.0, 0.0
 
     while time < P.time_max:
-        z_opt, target_ind, d_opt = \
-            calc_optimal_trajectory_in_T_step(node, ref_path, sp, 1.0)
+        z_ref, target_ind = \
+            calc_ref_trajectory_in_T_step(node, ref_path, sp)
 
         z0 = [node.x, node.y, node.v, node.yaw]
-        oa, odelta, ox, oy, oyaw, ov = linear_mpc_control(z_opt, z0, d_opt, oa, odelta)
 
-        if odelta is not None:
-            di, ai = odelta[0], oa[0]
-        else:
-            di, ai = 0.0, 0.0
+        a_opt, delta_opt, x_opt, y_opt, yaw_opt, v_opt = \
+            linear_mpc_control(z_ref, z0, a_opt, delta_opt)
 
-        node.update(ai, di, 1.0)
+        if delta_opt is not None:
+            delta_exc, a_exc = delta_opt[0], a_opt[0]
+
+        node.update(a_exc, delta_exc, 1.0)
         time += P.dt
 
         x.append(node.x)
@@ -333,12 +335,13 @@ def main():
         yaw.append(node.yaw)
         v.append(node.v)
         t.append(time)
-        d.append(di)
-        a.append(ai)
+        d.append(delta_exc)
+        a.append(a_exc)
 
         dist = math.hypot(node.x - cx[-1], node.y - cy[-1])
 
-        if dist < P.dist_stop and abs(node.v) < P.speed_stop:
+        if dist < P.dist_stop and \
+                abs(node.v) < P.speed_stop:
             break
 
         plt.cla()
@@ -346,16 +349,18 @@ def main():
                                      lambda event:
                                      [exit(0) if event.key == 'escape' else None])
 
-        if ox is not None:
-            plt.plot(ox, oy, 'xr')
+        if x_opt is not None:
+            plt.plot(x_opt, y_opt, 'xr')
 
         plt.plot(cx, cy, '-r')
         plt.plot(x, y, '-b')
-        plt.plot(z_opt[0, :], z_opt[1, :], 'xk')
+        plt.plot(z_ref[0, :], z_ref[1, :], 'xk')
         plt.plot(cx[target_ind], cy[target_ind], 'xg')
         plt.axis("equal")
         plt.title("Linear MPC, " + "v = " + str(round(node.v * 3.6, 2)))
         plt.pause(0.001)
+
+    plt.show()
 
 
 if __name__ == '__main__':
