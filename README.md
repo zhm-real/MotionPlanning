@@ -1,16 +1,16 @@
 # Motion Planner
 ## Overview
 This repository implemented some common motion planners used on autonomous vehicles, including
-* [Hybrid A* Planner: ](https://ai.stanford.edu/~ddolgov/papers/dolgov_gpp_stair08.pdf) Practical Search Techniques in Path Planning for Autonomous Driving
-* [Frenet Optimal Trajectory: ](https://www.researchgate.net/publication/224156269_Optimal_Trajectory_Generation_for_Dynamic_Street_Scenarios_in_a_Frenet_Frame) Optimal Trajectory Generation for Dynamic Street Scenarios in a Frenet Frame
-* [EM Planner: ](https://arxiv.org/abs/1807.08048) Baidu Apollo EM Motion Planner (Imcomplete)
+* [Hybrid A* Planner](https://ai.stanford.edu/~ddolgov/papers/dolgov_gpp_stair08.pdf)
+* [Frenet Optimal Trajectory](https://www.researchgate.net/publication/224156269_Optimal_Trajectory_Generation_for_Dynamic_Street_Scenarios_in_a_Frenet_Frame)
+* [EM Planner](https://arxiv.org/abs/1807.08048) (Imcomplete)
 
 Also, this repository provides some controllers for path tracking, including
-* [Pure Pursuit + PID: ](https://www.ri.cmu.edu/pub_files/pub3/coulter_r_craig_1992_1/coulter_r_craig_1992_1.pdf) Implementation of the Pure Pursuit Path Tracking Algorithm 
-* [Rear-Wheel Feedback + PID: ](https://www.ri.cmu.edu/pub_files/2009/2/Automatic_Steering_Methods_for_Autonomous_Automobile_Path_Tracking.pdf) Automatic Steering Methods for Autonomous Automobile Path Tracking
-* [Front-Wheel Feedback / Stanley + PID: ](http://robots.stanford.edu/papers/thrun.stanley05.pdf) Stanley: The Robot that Won the DARPA Grand Challenge
-* [LQR + PID: ](https://github.com/ApolloAuto/apollo/tree/master/modules/control/controller) ApolloAuto/apollo: An open autonomous driving platform
-* [Linear MPC: ](https://borrelli.me.berkeley.edu/pdfpub/pub-6.pdf) MPC-Based Approach to Active Steering for Autonomous Vehicle Systems
+* [Pure Pursuit + PID](https://www.ri.cmu.edu/pub_files/pub3/coulter_r_craig_1992_1/coulter_r_craig_1992_1.pdf)
+* [Rear-Wheel Feedback + PID](https://www.ri.cmu.edu/pub_files/2009/2/Automatic_Steering_Methods_for_Autonomous_Automobile_Path_Tracking.pdf)
+* [Front-Wheel Feedback / Stanley + PID](http://robots.stanford.edu/papers/thrun.stanley05.pdf)
+* [LQR + PID](https://github.com/ApolloAuto/apollo/tree/master/modules/control/controller)
+* [Linear MPC](https://borrelli.me.berkeley.edu/pdfpub/pub-6.pdf)
 
 ## Requirement
 * Python 3.6 or above
@@ -86,7 +86,7 @@ This repository uses two models: simple car model and [car pulling trailers mode
 * [Linear MPC: ](https://borrelli.me.berkeley.edu/pdfpub/pub-6.pdf) MPC-Based Approach to Active Steering for Autonomous Vehicle Systems
 
 ## Useful Material
-* [ApolloAuto/apollo](https://github.com/ApolloAuto/apollo) by Baidu
-* [Hybrid Path Planner (C++)](https://github.com/karlkurzer/path_planner) by KTH Research Concept Vehicle
-* [hybrid-astar-planner (MATLAB)](https://github.com/wanghuohuo0716/hybrid_A_star) by Mengli Liu
-* [HybridAStarTrailer (Julia)](https://github.com/AtsushiSakai/HybridAStarTrailer) by AtsushiSakai
+* [ApolloAuto/apollo: ](https://github.com/ApolloAuto/apollo) by Baidu
+* [Hybrid Path Planner (C++): ](https://github.com/karlkurzer/path_planner) by KTH Research Concept Vehicle
+* [hybrid-astar-planner (MATLAB): ](https://github.com/wanghuohuo0716/hybrid_A_star) by Mengli Liu
+* [HybridAStarTrailer (Julia): ](https://github.com/AtsushiSakai/HybridAStarTrailer) by AtsushiSakai
