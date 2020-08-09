@@ -300,16 +300,25 @@ def main():
     a_exc, delta_exc = 0.0, 0.0
 
     while time < P.time_max:
-        # z_ref, target_ind = \
-        #     calc_ref_trajectory_in_T_step(node, ref_path, sp)
-        #
-        # z0 = [node.x, node.y, node.v, node.yaw]
-        #
-        # a_opt, delta_opt, x_opt, y_opt, yaw_opt, v_opt = \
-        #     linear_mpc_control(z_ref, z0, a_opt, delta_opt)
+        z_ref, target_ind, theta_e, er = \
+            calc_ref_trajectory_in_T_step(node, ref_path, sp)
+
+        node0 = Node(x=node.x, y=node.y, yaw=node.yaw, v=node.v)
+        z0 = [er, 0.0, theta_e, 0.0, node.v]
+
+        a_opt, delta_opt = \
+            linear_mpc_control(z_ref, node0, z0, a_opt, delta_opt)
+
+        node_opt = Node(x=node.x, y=node.y, yaw=node.yaw, v=node.v)
+        x_opt, y_opt = [node_opt.x], [node_opt.y]
 
         if delta_opt is not None:
             delta_exc, a_exc = delta_opt[0], a_opt[0]
+
+            for ao, do in zip(a_opt, delta_opt):
+                node_opt.update(ao, do, 1.0)
+                x_opt.append(node_opt.x)
+                y_opt.append(node_opt.y)
 
         node.update(a_exc, delta_exc, 1.0)
         time += P.dt
