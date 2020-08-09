@@ -233,8 +233,8 @@ def is_path_collision(path):
 
 
 def verify_path(path):
-    # if any([v > C.MAX_SPEED for v in path.s_v]) or \
-    #         any([abs(a) > C.MAX_ACCEL for a in path.s_a]):
+    # if any([v > C.speed_max for v in path.s_v]) or \
+    #         any([abs(a) > C.acceleration_max for a in path.s_a]):
     #     return False
 
     if any([v > C.MAX_SPEED for v in path.s_v]) or \

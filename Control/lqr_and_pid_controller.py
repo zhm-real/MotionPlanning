@@ -46,7 +46,7 @@ class Node:
         self.direct = direct
 
     def update(self, a, delta, direct):
-        # delta = self.limit_input(delta)
+        # delta = self.limit_input_delta(delta)
         self.x += self.v * math.cos(self.yaw) * C.dt
         self.y += self.v * math.sin(self.yaw) * C.dt
         self.yaw += self.v / C.WB * math.tan(delta) * C.dt

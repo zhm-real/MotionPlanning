@@ -1,3 +1,8 @@
+"""
+Linear MPC controller
+author: huiming zhou
+"""
+
 import os
 import sys
 import math
@@ -15,23 +20,24 @@ import CurvesGenerator.cubic_spline as cs
 
 class P:
     # System config
-    NX = 4  # z = [x, y, v, phi]
-    NU = 2  # u = [acceleration, steer]
+    NX = 4  # state vector: z = [x, y, v, phi]
+    NU = 2  # input vector: u = [acceleration, steer]
     T = 6  # finite time horizon length
 
     # MPC config
-    Q = np.diag([1.0, 1.0, 0.5, 0.5])
-    Qf = np.diag([1.0, 1.0, 0.5, 0.5])
-    R = np.diag([0.01, 0.01])
-    Rd = np.diag([0.01, 1.0])
-    GOAL_DIS = 1.5  # goal distance
-    STOP_SPEED = 0.5 / 3.6  # stop speed
-    MAX_TIME = 500.0  # max simulation time
-    MAX_ITER = 5  # max iteration
-    TARGET_SPEED = 10.0 / 3.6  # target speed
-    N_IND_SEARCH = 10  # search index number
-    dt = 0.2
-    DU_TH = 0.1
+    Q = np.diag([1.0, 1.0, 0.5, 0.5])  # penalty for states
+    Qf = np.diag([1.0, 1.0, 0.5, 0.5])  # penalty for end state
+    R = np.diag([0.01, 0.01])  # penalty for inputs
+    Rd = np.diag([0.01, 1.0])  # penalty for change of inputs
+
+    dist_stop = 1.5  # stop permitted when dist to goal < dist_stop
+    speed_stop = 0.5 / 3.6  # stop permitted when speed < speed_stop
+    time_max = 500.0  # max simulation time
+    iter_max = 5  # max iteration
+    target_speed = 10.0 / 3.6  # target speed
+    N_IND = 10  # search index number
+    dt = 0.2  # time step
+    du_res = 0.1  # threshold for stopping iteration
 
     # vehicle config
     RF = 3.3  # [m] distance from rear to vehicle front end of vehicle
@@ -41,11 +47,12 @@ class P:
     WB = 2.5  # [m] Wheel base
     TR = 0.44  # [m] Tyre radius
     TW = 0.7  # [m] Tyre width
-    MAX_STEER = np.deg2rad(45.0)
-    MAX_DSTEER = np.deg2rad(30.0)  # maximum steering speed [rad/s]
-    MAX_SPEED = 55.0 / 3.6  # maximum speed [m/s]
-    MIN_SPEED = -20.0 / 3.6  # minimum speed [m/s]
-    MAX_ACCEL = 1.0  # maximum accel [m/ss]
+
+    steer_max = np.deg2rad(45.0)  # max steering angle [rad]
+    steer_change_max = np.deg2rad(30.0)  # maximum steering speed [rad/s]
+    speed_max = 55.0 / 3.6  # maximum speed [m/s]
+    speed_min = -20.0 / 3.6  # minimum speed [m/s]
+    acceleration_max = 1.0  # maximum acceleration [m/s2]
 
 
 class Node:
@@ -57,22 +64,33 @@ class Node:
         self.direct = direct
 
     def update(self, a, delta, direct):
-        delta = self.limit_input(delta)
+        delta = self.limit_input_delta(delta)
         self.x += self.v * math.cos(self.yaw) * P.dt
         self.y += self.v * math.sin(self.yaw) * P.dt
         self.yaw += self.v / P.WB * math.tan(delta) * P.dt
         self.direct = direct
         self.v += self.direct * a * P.dt
+        self.v = self.limit_speed(self.v)
 
     @staticmethod
-    def limit_input(delta):
-        if delta >= P.MAX_STEER:
-            return P.MAX_STEER
+    def limit_input_delta(delta):
+        if delta >= P.steer_max:
+            return P.steer_max
 
-        if delta <= -P.MAX_STEER:
-            return -P.MAX_STEER
+        if delta <= -P.steer_max:
+            return -P.steer_max
 
         return delta
+
+    @staticmethod
+    def limit_speed(v):
+        if v >= P.speed_max:
+            return P.speed_max
+
+        if v <= P.speed_min:
+            return P.speed_min
+
+        return v
 
 
 class PATH:
@@ -85,8 +103,8 @@ class PATH:
         self.ind_old = 0
 
     def nearest_index(self, node):
-        dx = [node.x - x for x in self.cx[self.ind_old: (self.ind_old + P.N_IND_SEARCH)]]
-        dy = [node.y - y for y in self.cy[self.ind_old: (self.ind_old + P.N_IND_SEARCH)]]
+        dx = [node.x - x for x in self.cx[self.ind_old: (self.ind_old + P.N_IND)]]
+        dy = [node.y - y for y in self.cy[self.ind_old: (self.ind_old + P.N_IND)]]
         dist = np.hypot(dx, dy)
         ind = int(np.argmin(dist))
         dist_min = dist[ind]
@@ -212,12 +230,13 @@ def linear_mpc_control(z_opt, z0, d_opt, oa, od):
         oa = [0.0] * P.T
         od = [0.0] * P.T
 
-    for i in range(P.MAX_ITER):
+    for i in range(P.iter_max):
         z_bar = predict_model(z0, oa, od, z_opt)
         poa, pod = oa[:], od[:]
         oa, od, ox, oy, oyaw, ov = solve_linear_mpc(z_opt, z_bar, z0, d_opt)
         du = sum(abs(oa - poa)) + sum(abs(od - pod))  # calc u change value
-        if du <= P.DU_TH:
+
+        if du <= P.du_res:
             break
     else:
         print("Iterative is max iter")
@@ -244,15 +263,15 @@ def solve_linear_mpc(z_opt, z_bar, z0, d_opt):
 
         if t < P.T - 1:
             cost += cvxpy.quad_form(u[:, t + 1] - u[:, t], P.Rd)
-            constrains += [cvxpy.abs(u[1, t + 1] - u[1, t]) <= P.MAX_DSTEER * P.dt]
+            constrains += [cvxpy.abs(u[1, t + 1] - u[1, t]) <= P.steer_change_max * P.dt]
 
     cost += cvxpy.quad_form(z_opt[:, P.T] - z[:, P.T], P.Qf)
 
     constrains += [z[:, 0] == z0]
-    constrains += [z[2, :] <= P.MAX_SPEED]
-    constrains += [z[2, :] >= P.MIN_SPEED]
-    constrains += [cvxpy.abs(u[0, :]) <= P.MAX_ACCEL]
-    constrains += [cvxpy.abs(u[1, :]) <= P.MAX_STEER]
+    constrains += [z[2, :] <= P.speed_max]
+    constrains += [z[2, :] >= P.speed_min]
+    constrains += [cvxpy.abs(u[0, :]) <= P.acceleration_max]
+    constrains += [cvxpy.abs(u[1, :]) <= P.steer_max]
 
     prob = cvxpy.Problem(cvxpy.Minimize(cost), constrains)
     prob.solve(solver=cvxpy.OSQP, verbose=False)
@@ -276,7 +295,7 @@ def main():
     ax = [0.0, 20.0, 40.0, 55.0, 70.0, 85.0]
     ay = [0.0, 50.0, 20.0, 35.0, 0.0, 10.0]
     cx, cy, cyaw, ck, s = cs.calc_spline_course(ax, ay, ds=1.0)
-    sp = calc_speed_profile(cx, cy, cyaw, P.TARGET_SPEED)
+    sp = calc_speed_profile(cx, cy, cyaw, P.target_speed)
 
     ref_path = PATH(cx, cy, cyaw, ck)
     node = Node(x=cx[0], y=cy[0], yaw=cyaw[0], v=0.0)
@@ -294,7 +313,7 @@ def main():
 
     odelta, oa = None, None
 
-    while time < P.MAX_TIME:
+    while time < P.time_max:
         z_opt, target_ind, d_opt = \
             calc_optimal_trajectory_in_T_step(node, ref_path, sp, 1.0)
 
@@ -319,7 +338,7 @@ def main():
 
         dist = math.hypot(node.x - cx[-1], node.y - cy[-1])
 
-        if dist < P.GOAL_DIS and abs(node.v) < P.STOP_SPEED:
+        if dist < P.dist_stop and abs(node.v) < P.speed_stop:
             break
 
         plt.cla()
