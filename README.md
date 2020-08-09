@@ -1,4 +1,3 @@
-# Motion Planner
 ## Overview
 This repository implemented some common motion planners used on autonomous vehicles, including
 * [Hybrid A* Planner](https://ai.stanford.edu/~ddolgov/papers/dolgov_gpp_stair08.pdf)
