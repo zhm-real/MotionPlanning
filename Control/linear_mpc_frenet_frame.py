@@ -1,5 +1,5 @@
 """
-Linear MPC controller (X-Y frame)
+Linear MPC controller (Frenet frame)
 author: huiming zhou
 """
 
@@ -20,13 +20,13 @@ import CurvesGenerator.cubic_spline as cs
 
 class P:
     # System config
-    NX = 4  # state vector: z = [x, y, v, phi]
+    NX = 5  # state vector: z = [x, y, v, phi]
     NU = 2  # input vector: u = [acceleration, steer]
     T = 6  # finite time horizon length
 
     # MPC config
-    Q = np.diag([1.0, 1.0, 0.5, 0.5])  # penalty for states
-    Qf = np.diag([1.0, 1.0, 0.5, 0.5])  # penalty for end state
+    Q = np.diag([1.0, 1.0, 0.5, 0.5, 0.5])  # penalty for states
+    Qf = np.diag([1.0, 1.0, 0.5, 0.5, 0.5])  # penalty for end state
     R = np.diag([0.01, 0.1])  # penalty for inputs
     Rd = np.diag([0.01, 1.0])  # penalty for change of inputs
 
@@ -103,7 +103,7 @@ class PATH:
         self.length = len(cx)
         self.ind_old = 0
 
-    def nearest_index(self, node):
+    def calc_theta_e_and_er(self, node):
         dx = [node.x - x for x in self.cx[self.ind_old: (self.ind_old + P.N_IND)]]
         dy = [node.y - y for y in self.cy[self.ind_old: (self.ind_old + P.N_IND)]]
         dist = np.hypot(dx, dy)
@@ -121,20 +121,22 @@ class PATH:
         er = np.dot(vec_target_2_rear.T, rear_axle_vec_rot_90)
         er = er[0][0]
 
-        return ind, er
+        theta = node.yaw
+        theta_p = self.cyaw[ind]
+        theta_e = pi_2_pi(theta - theta_p)
+
+        k = self.ck[ind]
+
+        return theta_e, er, k, ind
 
 
 def calc_ref_trajectory_in_T_step(node, ref_path, sp):
     z_ref = np.zeros((P.NX, P.T + 1))
     length = ref_path.length
 
-    ind, _ = ref_path.nearest_index(node)
+    theta_e, er, k, ind = ref_path.calc_theta_e_and_er(node)
 
-    z_ref[0, 0] = ref_path.cx[ind]
-    z_ref[1, 0] = ref_path.cy[ind]
-    z_ref[2, 0] = sp[ind]
-    z_ref[3, 0] = ref_path.cyaw[ind]
-
+    z_ref[4, 0] = sp[ind]
     dist_move = 0.0
 
     for i in range(1, P.T + 1):
@@ -142,25 +144,20 @@ def calc_ref_trajectory_in_T_step(node, ref_path, sp):
         ind_move = int(round(dist_move / P.d_dist))
         index = min(ind + ind_move, length - 1)
 
-        z_ref[0, i] = ref_path.cx[index]
-        z_ref[1, i] = ref_path.cy[index]
-        z_ref[2, i] = sp[index]
-        z_ref[3, i] = ref_path.cyaw[index]
+        z_ref[4, i] = sp[index]
 
-    return z_ref, ind
+    return z_ref, ind, theta_e, er
 
 
-def linear_mpc_control(z_ref, z0, a_old, delta_old):
+def linear_mpc_control(z_ref, node0, z0, a_old, delta_old):
     if a_old is None or delta_old is None:
         a_old = [0.0] * P.T
         delta_old = [0.0] * P.T
 
-    x, y, yaw, v = None, None, None, None
-
     for k in range(P.iter_max):
-        z_bar = predict_states_in_T_step(z0, a_old, delta_old, z_ref)
+        v_bar = predict_states_in_T_step(node0, a_old, delta_old)
         a_rec, delta_rec = a_old[:], delta_old[:]
-        a_old, delta_old, x, y, yaw, v = solve_linear_mpc(z_ref, z_bar, z0, delta_old)
+        a_old, delta_old = solve_linear_mpc(z_ref, v_bar, z0)
 
         du_a_max = max([abs(ia - iao) for ia, iao in zip(a_old, a_rec)])
         du_d_max = max([abs(ide - ido) for ide, ido in zip(delta_old, delta_rec)])
@@ -168,47 +165,10 @@ def linear_mpc_control(z_ref, z0, a_old, delta_old):
         if max(du_a_max, du_d_max) < P.du_res:
             break
 
-    return a_old, delta_old, x, y, yaw, v
+    return a_old, delta_old
 
 
-def predict_states_in_T_step(z0, a, delta, z_ref):
-    z_bar = z_ref * 0.0
-
-    for i in range(P.NX):
-        z_bar[i, 0] = z0[i]
-
-    node = Node(x=z0[0], y=z0[1], v=z0[2], yaw=z0[3])
-
-    for ai, di, i in zip(a, delta, range(1, P.T + 1)):
-        node.update(ai, di, 1.0)
-        z_bar[0, i] = node.x
-        z_bar[1, i] = node.y
-        z_bar[2, i] = node.v
-        z_bar[3, i] = node.yaw
-
-    return z_bar
-
-
-def calc_linear_discrete_model(v, phi, delta):
-    A = np.array([[1.0, 0.0, P.dt * math.cos(phi), - P.dt * v * math.sin(phi)],
-                  [0.0, 1.0, P.dt * math.sin(phi), P.dt * v * math.cos(phi)],
-                  [0.0, 0.0, 1.0, 0.0],
-                  [0.0, 0.0, P.dt * math.tan(delta) / P.WB, 1.0]])
-
-    B = np.array([[0.0, 0.0],
-                  [0.0, 0.0],
-                  [P.dt, 0.0],
-                  [0.0, P.dt * v / (P.WB * math.cos(delta) ** 2)]])
-
-    C = np.array([P.dt * v * math.sin(phi) * phi,
-                  -P.dt * v * math.cos(phi) * phi,
-                  0.0,
-                  -P.dt * v * delta / (P.WB * math.cos(delta) ** 2)])
-
-    return A, B, C
-
-
-def solve_linear_mpc(z_ref, z_bar, z0, d_bar):
+def solve_linear_mpc(z_ref, v_bar, z0):
     z = cvxpy.Variable((P.NX, P.T + 1))
     u = cvxpy.Variable((P.NU, P.T))
 
@@ -219,9 +179,9 @@ def solve_linear_mpc(z_ref, z_bar, z0, d_bar):
         cost += cvxpy.quad_form(u[:, t], P.R)
         cost += cvxpy.quad_form(z_ref[:, t] - z[:, t], P.Q)
 
-        A, B, C = calc_linear_discrete_model(z_bar[2, t], z_bar[3, t], d_bar[t])
+        A, B = calc_linear_discrete_model(v_bar[t])
 
-        constrains += [z[:, t + 1] == A @ z[:, t] + B @ u[:, t] + C]
+        constrains += [z[:, t + 1] == A @ z[:, t] + B @ u[:, t]]
 
         if t < P.T - 1:
             cost += cvxpy.quad_form(u[:, t + 1] - u[:, t], P.Rd)
@@ -230,28 +190,51 @@ def solve_linear_mpc(z_ref, z_bar, z0, d_bar):
     cost += cvxpy.quad_form(z_ref[:, P.T] - z[:, P.T], P.Qf)
 
     constrains += [z[:, 0] == z0]
-    constrains += [z[2, :] <= P.speed_max]
-    constrains += [z[2, :] >= P.speed_min]
+    constrains += [z[4, :] <= P.speed_max]
+    constrains += [z[4, :] >= P.speed_min]
     constrains += [cvxpy.abs(u[0, :]) <= P.acceleration_max]
     constrains += [cvxpy.abs(u[1, :]) <= P.steer_max]
 
     prob = cvxpy.Problem(cvxpy.Minimize(cost), constrains)
     prob.solve(solver=cvxpy.OSQP)
 
-    a, delta, x, y, yaw, v = None, None, None, None, None, None
+    a, delta = None, None
 
     if prob.status == cvxpy.OPTIMAL or \
             prob.status == cvxpy.OPTIMAL_INACCURATE:
-        x = z.value[0, :]
-        y = z.value[1, :]
-        v = z.value[2, :]
-        yaw = z.value[3, :]
         a = u.value[0, :]
         delta = u.value[1, :]
     else:
         print("Cannot solve linear mpc!")
 
-    return a, delta, x, y, yaw, v
+    return a, delta
+
+
+def predict_states_in_T_step(node0, a, delta):
+    v_bar = [0.0] * (P.T + 1)
+    v_bar[0] = node0.v
+
+    for ai, di, i in zip(a, delta, range(1, P.T + 1)):
+        node0.update(ai, di, 1.0)
+        v_bar[i] = node0.v
+
+    return v_bar
+
+
+def calc_linear_discrete_model(v):
+    A = np.array([[1.0, P.dt, 0.0, 0.0, 0.0],
+                  [0.0, 0.0, v, 0.0, 0.0],
+                  [0.0, 0.0, 1.0, P.dt, 0.0],
+                  [0.0, 0.0, 0.0, 0.0, 0.0],
+                  [0.0, 0.0, 0.0, 0.0, 1.0]])
+
+    B = np.array([[0.0, 0.0],
+                  [0.0, 0.0],
+                  [0.0, 0.0],
+                  [v / P.WB, 0.0],
+                  [0.0, P.dt]])
+
+    return A, B
 
 
 def calc_speed_profile(cx, cy, cyaw, target_speed):
@@ -295,8 +278,9 @@ def pi_2_pi(angle):
 def main():
     ax = [0.0, 20.0, 40.0, 55.0, 70.0, 85.0]
     ay = [0.0, 50.0, 20.0, 35.0, 0.0, 10.0]
-    cx, cy, cyaw, ck, s = cs.calc_spline_course(
-        ax, ay, ds=P.d_dist)
+
+    cx, cy, cyaw, ck, s = \
+        cs.calc_spline_course(ax, ay, ds=P.d_dist)
 
     sp = calc_speed_profile(cx, cy, cyaw, P.target_speed)
 
