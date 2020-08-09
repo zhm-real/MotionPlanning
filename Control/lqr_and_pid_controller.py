@@ -1,3 +1,8 @@
+"""
+LQR and PID Controller
+author: huiming zhou
+"""
+
 import os
 import sys
 import math
@@ -71,7 +76,7 @@ class PATH:
     def calc_theta_e_and_er(self, node):
         """
         calc theta_e and er.
-        theta_e = theta_car - theta_path
+        theta_e = yaw_car - yaw_ref_path
         er = lateral distance in frenet frame
 
         :param node: current information of vehicle
@@ -129,7 +134,7 @@ def lqr_lateral_control(node, er_old, theta_e_old, ref_path):
                   [theta_e],
                   [(theta_e - theta_e_old) / C.dt]])
     delta_fb = -K @ X
-    delta_ff = math.atan(C.WB * k)
+    delta_ff = C.WB * k
     delta = delta_ff + delta_fb
 
     return delta, er, theta_e, ind
@@ -148,7 +153,7 @@ def solve_riccati_equation(A, B, Q, R):
 
     P = Q
     P_next = Q
-    iter_max = 150
+    iter_max = 100
     eps = 0.01
 
     for k in range(iter_max):
@@ -334,7 +339,7 @@ def main():
             plt.plot(cx[ind], cy[ind], '.r')
             draw.draw_car(node.x, node.y, node.yaw, steer, C)
             plt.axis("equal")
-            plt.title("lqr: v=" + str(node.v * 3.6)[:4] + "km/h")
+            plt.title("LQR & PID: v=" + str(node.v * 3.6)[:4] + "km/h")
             plt.gcf().canvas.mpl_connect('key_release_event',
                                          lambda event:
                                          [exit(0) if event.key == 'escape' else None])

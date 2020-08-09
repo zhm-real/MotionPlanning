@@ -1,3 +1,8 @@
+"""
+Pure Pursuit
+author: huiming zhou
+"""
+
 import os
 import sys
 import math
