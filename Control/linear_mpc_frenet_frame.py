@@ -20,15 +20,15 @@ import CurvesGenerator.cubic_spline as cs
 
 class P:
     # System config
-    NX = 5  # state vector: z = [x, y, v, phi]
+    NX = 5  # state vector: z = [e, e_dot, theta_e, theta_e_dot, v]
     NU = 2  # input vector: u = [acceleration, steer]
     T = 6  # finite time horizon length
 
     # MPC config
-    Q = np.diag([1.0, 1.0, 0.5, 0.5, 0.5])  # penalty for states
-    Qf = np.diag([1.0, 1.0, 0.5, 0.5, 0.5])  # penalty for end state
+    Q = np.diag([1.0, 1.0, 1.0, 1.0, 1.0])  # penalty for states
+    Qf = np.diag([1.0, 1.0, 1.0, 1.0, 1.0])  # penalty for end state
     R = np.diag([0.01, 0.1])  # penalty for inputs
-    Rd = np.diag([0.01, 1.0])  # penalty for change of inputs
+    Rd = np.diag([0.01, 0.1])  # penalty for change of inputs
 
     dist_stop = 1.5  # stop permitted when dist to goal < dist_stop
     speed_stop = 0.5 / 3.6  # stop permitted when speed < speed_stop
@@ -125,16 +125,14 @@ class PATH:
         theta_p = self.cyaw[ind]
         theta_e = pi_2_pi(theta - theta_p)
 
-        k = self.ck[ind]
-
-        return theta_e, er, k, ind
+        return theta_e, er, ind
 
 
 def calc_ref_trajectory_in_T_step(node, ref_path, sp):
     z_ref = np.zeros((P.NX, P.T + 1))
     length = ref_path.length
 
-    theta_e, er, k, ind = ref_path.calc_theta_e_and_er(node)
+    theta_e, er, ind = ref_path.calc_theta_e_and_er(node)
 
     z_ref[4, 0] = sp[ind]
     dist_move = 0.0
@@ -177,7 +175,7 @@ def solve_linear_mpc(z_ref, v_bar, z0):
 
     for t in range(P.T):
         cost += cvxpy.quad_form(u[:, t], P.R)
-        cost += cvxpy.quad_form(z_ref[:, t] - z[:, t], P.Q)
+        cost += cvxpy.quad_form(z[:, t] - z_ref[:, t], P.Q)
 
         A, B = calc_linear_discrete_model(v_bar[t])
 
@@ -206,6 +204,8 @@ def solve_linear_mpc(z_ref, v_bar, z0):
         delta = u.value[1, :]
     else:
         print("Cannot solve linear mpc!")
+
+    print(delta)
 
     return a, delta
 
@@ -309,16 +309,16 @@ def main():
         a_opt, delta_opt = \
             linear_mpc_control(z_ref, node0, z0, a_opt, delta_opt)
 
-        node_opt = Node(x=node.x, y=node.y, yaw=node.yaw, v=node.v)
-        x_opt, y_opt = [node_opt.x], [node_opt.y]
+        # node_opt = Node(x=node.x, y=node.y, yaw=node.yaw, v=node.v)
+        # x_opt, y_opt = [node_opt.x], [node_opt.y]
 
         if delta_opt is not None:
             delta_exc, a_exc = delta_opt[0], a_opt[0]
 
-            for ao, do in zip(a_opt, delta_opt):
-                node_opt.update(ao, do, 1.0)
-                x_opt.append(node_opt.x)
-                y_opt.append(node_opt.y)
+            # for ao, do in zip(a_opt, delta_opt):
+            #     node_opt.update(ao, do, 1.0)
+            #     x_opt.append(node_opt.x)
+            #     y_opt.append(node_opt.y)
 
         node.update(a_exc, delta_exc, 1.0)
         time += P.dt
@@ -342,8 +342,8 @@ def main():
                                      lambda event:
                                      [exit(0) if event.key == 'escape' else None])
 
-        if x_opt is not None:
-            plt.plot(x_opt, y_opt, 'xr')
+        # if x_opt is not None:
+        #     plt.plot(x_opt, y_opt, 'xr')
 
         plt.plot(cx, cy, '-r')
         plt.plot(x, y, '-b')

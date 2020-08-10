@@ -25,10 +25,10 @@ class P:
     T = 6  # finite time horizon length
 
     # MPC config
-    Q = np.diag([1.0, 1.0, 0.5, 0.5])  # penalty for states
-    Qf = np.diag([1.0, 1.0, 0.5, 0.5])  # penalty for end state
+    Q = np.diag([1.0, 1.0, 1.0, 1.0])  # penalty for states
+    Qf = np.diag([1.0, 1.0, 1.0, 1.0])  # penalty for end state
     R = np.diag([0.01, 0.1])  # penalty for inputs
-    Rd = np.diag([0.01, 1.0])  # penalty for change of inputs
+    Rd = np.diag([0.01, 0.1])  # penalty for change of inputs
 
     dist_stop = 1.5  # stop permitted when dist to goal < dist_stop
     speed_stop = 0.5 / 3.6  # stop permitted when speed < speed_stop
@@ -104,6 +104,12 @@ class PATH:
         self.ind_old = 0
 
     def nearest_index(self, node):
+        """
+        calc index of the nearest node in N steps
+        :param node: current information
+        :return: nearest index, lateral distance to ref point
+        """
+
         dx = [node.x - x for x in self.cx[self.ind_old: (self.ind_old + P.N_IND)]]
         dy = [node.y - y for y in self.cy[self.ind_old: (self.ind_old + P.N_IND)]]
         dist = np.hypot(dx, dy)
@@ -125,6 +131,15 @@ class PATH:
 
 
 def calc_ref_trajectory_in_T_step(node, ref_path, sp):
+    """
+    calc referent trajectory in T steps: [x, y, v, yaw]
+    using the current velocity, calc the T points along the reference path
+    :param node: current information
+    :param ref_path: reference path: [x, y, yaw]
+    :param sp: speed profile (designed speed strategy)
+    :return: reference trajectory
+    """
+
     z_ref = np.zeros((P.NX, P.T + 1))
     length = ref_path.length
 
@@ -151,6 +166,15 @@ def calc_ref_trajectory_in_T_step(node, ref_path, sp):
 
 
 def linear_mpc_control(z_ref, z0, a_old, delta_old):
+    """
+    linear mpc controller
+    :param z_ref: reference trajectory in T steps
+    :param z0: initial state vector
+    :param a_old: acceleration of T steps of last time
+    :param delta_old: delta of T steps of last time
+    :return: acceleration and delta strategy based on current information
+    """
+
     if a_old is None or delta_old is None:
         a_old = [0.0] * P.T
         delta_old = [0.0] * P.T
@@ -172,6 +196,16 @@ def linear_mpc_control(z_ref, z0, a_old, delta_old):
 
 
 def predict_states_in_T_step(z0, a, delta, z_ref):
+    """
+    given the current state, using the acceleration and delta strategy of last time,
+    predict the states of vehicle in T steps.
+    :param z0: initial state
+    :param a: acceleration strategy of last time
+    :param delta: delta strategy of last time
+    :param z_ref: reference trajectory
+    :return: predict states in T steps (z_bar, used for calc linear motion model)
+    """
+
     z_bar = z_ref * 0.0
 
     for i in range(P.NX):
@@ -190,6 +224,14 @@ def predict_states_in_T_step(z0, a, delta, z_ref):
 
 
 def calc_linear_discrete_model(v, phi, delta):
+    """
+    calc linear and discrete time dynamic model.
+    :param v: speed: v_bar
+    :param phi: angle of vehicle: phi_bar
+    :param delta: steering angle: delta_bar
+    :return: A, B, C
+    """
+
     A = np.array([[1.0, 0.0, P.dt * math.cos(phi), - P.dt * v * math.sin(phi)],
                   [0.0, 1.0, P.dt * math.sin(phi), P.dt * v * math.cos(phi)],
                   [0.0, 0.0, 1.0, 0.0],
@@ -209,6 +251,15 @@ def calc_linear_discrete_model(v, phi, delta):
 
 
 def solve_linear_mpc(z_ref, z_bar, z0, d_bar):
+    """
+    solve the quadratic optimization problem using cvxpy, solver: OSQP
+    :param z_ref: reference trajectory (desired trajectory: [x, y, v, yaw])
+    :param z_bar: predicted states in T steps
+    :param z0: initial state
+    :param d_bar: delta_bar
+    :return: optimal acceleration and steering strategy
+    """
+
     z = cvxpy.Variable((P.NX, P.T + 1))
     u = cvxpy.Variable((P.NU, P.T))
 
@@ -255,6 +306,15 @@ def solve_linear_mpc(z_ref, z_bar, z0, d_bar):
 
 
 def calc_speed_profile(cx, cy, cyaw, target_speed):
+    """
+    design appropriate speed strategy
+    :param cx: x of reference path [m]
+    :param cy: y of reference path [m]
+    :param cyaw: yaw of reference path [m]
+    :param target_speed: target speed [m/s]
+    :return: speed profile
+    """
+
     speed_profile = [target_speed] * len(cx)
     direction = 1.0  # forward
 
