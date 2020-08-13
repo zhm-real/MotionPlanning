@@ -38,6 +38,74 @@ class VehicleState:
         self.v = v
         self.gear = gear
 
+    def UpdateVehicleState(self, delta, a, gear=Gear.GEAR_DRIVE):
+        """
+        update states of vehicle
+
+        :param delta: steering angle [rad]
+        :param a: acceleration [m / s^2]
+        :param gear: gear mode [GEAR_DRIVE / GEAR/REVERSE]
+        """
+
+        delta, a = self.RegulateInput(delta, a)
+        wheelbase_ = l_r + l_f
+
+        self.gear = gear
+        self.x += self.v * math.cos(self.yaw) * ts
+        self.y += self.v * math.sin(self.yaw) * ts
+        self.yaw += self.v / wheelbase_ * math.tan(delta) * ts
+
+        if gear == Gear.GEAR_DRIVE:
+            self.v += a * ts
+        else:
+            self.v += -1.0 * a * ts
+
+        self.v = self.RegulateOutput(self.v)
+
+    @staticmethod
+    def RegulateInput(delta, a):
+        """
+        regulate delta to : - max_steer_angle ~ max_steer_angle
+        regulate a to : - max_acceleration ~ max_acceleration
+
+        :param delta: steering angle [rad]
+        :param a: acceleration [m / s^2]
+        :return: regulated delta and acceleration
+        """
+
+        if delta < -1.0 * max_steer_angle:
+            delta = -1.0 * max_steer_angle
+
+        if delta > 1.0 * max_steer_angle:
+            delta = 1.0 * max_steer_angle
+
+        if a < -1.0 * max_acceleration:
+            a = -1.0 * max_acceleration
+
+        if a > 1.0 * max_acceleration:
+            a = 1.0 * max_acceleration
+
+        return delta, a
+
+    @staticmethod
+    def RegulateOutput(v):
+        """
+        regulate v to : -max_speed ~ max_speed
+
+        :param v: calculated speed [m / s]
+        :return: regulated speed
+        """
+
+        max_speed_ = max_speed / 3.6
+
+        if v < -1.0 * max_speed_:
+            v = -1.0 * max_speed_
+
+        if v > 1.0 * max_speed_:
+            v = 1.0 * max_speed_
+
+        return v
+
 
 class TrajectoryAnalyzer:
     def __init__(self, x, y, yaw, k):
@@ -96,7 +164,59 @@ class TrajectoryAnalyzer:
 
 class LatController:
     def __init__(self):
+        self.ts_ = ts
+        self.mass_ = m_f + m_r
+        self.wheelbase_ = l_f + l_r
         self.vehicle_state = VehicleState()
+
+    @staticmethod
+    def SolveLQRProblem(A, B, Q, R, tolerance, max_num_iteration):
+        """
+        iteratively calculating feedback matrix K
+
+        :param A: matrix_a_
+        :param B: matrix_b_
+        :param Q: matrix_q_
+        :param R: matrix_r_
+        :param tolerance: lqr_eps
+        :param max_num_iteration: max_iteration
+        :return: feedback matrix K
+        """
+
+        assert np.size(A, 0) == np.size(A, 1) and \
+               np.size(B, 0) == np.size(A, 0) and \
+               np.size(Q, 0) == np.size(Q, 1) and \
+               np.size(Q, 0) == np.size(A, 1) and \
+               np.size(R, 0) == np.size(R, 1) and \
+               np.size(R, 0) == np.size(B, 1), \
+            "LQR solver: one or more matrices have incompatible dimensions."
+
+        M = np.zeros(np.size(Q, 0), np.size(R, 1))
+
+        AT = A.T
+        BT = B.T
+        MT = M.T
+
+        P = Q
+        num_iteration = 0
+        diff = math.inf
+
+        while num_iteration < max_num_iteration and diff > tolerance:
+            num_iteration += 1
+            P_next = AT @ P @ A - \
+                     (AT @ P @ B + M) @ np.linalg.inv(R + BT @ P @ B) @ (BT @ P @ A + MT) + Q
+
+            # check the difference between P and P_next
+            diff = abs(P_next - P).max()
+            P = P_next
+
+        if num_iteration >= max_num_iteration:
+            print("LQR solver cannot converge to a solution",
+                  "last consecutive result diff is: ", diff)
+
+        K = np.linalg.inv(BT @ P @ B + R) * (BT @ P @ A + MT)
+
+        return K
 
     def UpdateMatrix(self):
         """
@@ -104,8 +224,8 @@ class LatController:
         :return: A, b
         """
 
-        ts_ = ts
-        mass_ = m_f + m_r
+        ts_ = self.ts_
+        mass_ = self.mass_
 
         v = self.vehicle_state.v
 
@@ -167,13 +287,16 @@ def pi_2_pi(angle):
     :return: regulated angle
     """
 
-    if angle > math.pi:
-        return angle - 2.0 * math.pi
+    M_PI = math.pi
 
-    if angle < -math.pi:
-        return angle + 2.0 * math.pi
+    if angle > M_PI:
+        return angle - 2.0 * M_PI
+
+    if angle < -M_PI:
+        return angle + 2.0 * M_PI
 
     return angle
+
 
 def main():
     return
