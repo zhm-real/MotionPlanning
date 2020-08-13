@@ -46,4 +46,4 @@ def veloSmooth(v, amax, Ts):
 
     for j in range(len(index3)):
         if v_ex[index3[j]] > v_cut1 or v_ex[index3[j] + 1] > v_cut1:
-            return 
+            return
