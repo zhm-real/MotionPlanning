@@ -83,9 +83,10 @@ class PATH:
         :return: theta_e and er
         """
 
-        dx = [node.x - x for x in self.cx]
-        dy = [node.y - y for y in self.cy]
+        dx = [node.x - x for x in self.cx[self.ind_old: self.len]]
+        dy = [node.y - y for y in self.cy[self.ind_old: self.len]]
         ind = int(np.argmin(np.hypot(dx, dy)))
+        dist = math.hypot(dx[ind], dy[ind])
 
         rear_axle_vec_rot_90 = np.array([[math.cos(node.yaw + math.pi / 2.0)],
                                          [math.sin(node.yaw + math.pi / 2.0)]])
@@ -93,16 +94,22 @@ class PATH:
         vec_target_2_rear = np.array([[dx[ind]],
                                       [dy[ind]]])
 
-        er = np.dot(vec_target_2_rear.T, rear_axle_vec_rot_90)
-        er = er[0][0]
+        flag = np.dot(vec_target_2_rear.T, rear_axle_vec_rot_90)
 
+        if flag > 0:
+            er = 1.0 * dist
+        else:
+            er = -1.0 * dist
+
+        index = ind + self.ind_old
         theta = node.yaw
-        theta_p = self.cyaw[ind]
+        theta_p = self.cyaw[index]
         theta_e = pi_2_pi(theta - theta_p)
 
-        k = self.ck[ind]
+        k = self.ck[index]
+        self.ind_old = index
 
-        return theta_e, er, k, ind
+        return theta_e, er, k, index
 
 
 def lqr_lateral_control(node, er_old, theta_e_old, ref_path):
