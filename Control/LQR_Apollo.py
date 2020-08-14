@@ -36,12 +36,18 @@ class VehicleState:
         self.y = y
         self.yaw = yaw
         self.v = v
+        self.e_cg = 0.0
+        self.theta_e = 0.0
+
         self.gear = gear
 
-    def UpdateVehicleState(self, delta, a, gear=Gear.GEAR_DRIVE):
+    def UpdateVehicleState(self, delta, a, e_cg, theta_e,
+                           gear=Gear.GEAR_DRIVE):
         """
         update states of vehicle
 
+        :param theta_e: yaw error to ref trajectory
+        :param e_cg: lateral error to ref trajectory
         :param delta: steering angle [rad]
         :param a: acceleration [m / s^2]
         :param gear: gear mode [GEAR_DRIVE / GEAR/REVERSE]
@@ -54,6 +60,8 @@ class VehicleState:
         self.x += self.v * math.cos(self.yaw) * ts
         self.y += self.v * math.sin(self.yaw) * ts
         self.yaw += self.v / wheelbase_ * math.tan(delta) * ts
+        self.e_cg = e_cg
+        self.theta_e = theta_e
 
         if gear == Gear.GEAR_DRIVE:
             self.v += a * ts
@@ -168,6 +176,71 @@ class LatController:
         self.mass_ = m_f + m_r
         self.wheelbase_ = l_f + l_r
         self.vehicle_state = VehicleState()
+
+    def ComputeControlCommand(self, vehicle_state, ref_trajectory):
+        """
+        calc LQR control command.
+        :param vehicle_state:
+        :param ref_trajectory:
+        :return:
+        """
+
+        ts_ = ts
+        e_cg_old = vehicle_state.e_cg
+        theta_e_old = vehicle_state.theta_e
+
+        theta_e, e_cg, yaw_ref, k_ref = \
+            ref_trajectory.ToTrajectoryFrame(vehicle_state)
+
+        matrix_ad_, matrix_bd_ = self.UpdateMatrix()
+
+        matrix_state_ = np.zeros((state_size, 1))
+        matrix_r_ = np.zeros((1, 1))
+        matrix_q_ = np.diag(matrix_q)
+
+        matrix_k_ = self.SolveLQRProblem(matrix_ad_, matrix_bd_, matrix_q_,
+                                         matrix_r_, eps, max_iteration)
+
+        matrix_state_[0][0] = e_cg
+        matrix_state_[1][0] = (e_cg - e_cg_old) / ts_
+        matrix_state_[2][0] = theta_e
+        matrix_state_[3][0] = (theta_e - theta_e_old) / ts_
+
+        steer_angle_feedback = -matrix_k_ @ matrix_state_
+
+        steer_angle_feedforward = self.ComputeFeedForward(vehicle_state, k_ref, matrix_k_)
+
+        steer_angle = steer_angle_feedback + steer_angle_feedforward
+
+        return steer_angle
+
+    @staticmethod
+    def ComputeFeedForward(vehicle_state, ref_curvature, matrix_k_):
+        """
+        calc feedforward control term to decrease the steady error.
+        :param vehicle_state: vehicle state
+        :param ref_curvature: curvature of the target point in ref trajectory
+        :param matrix_k_: feedback matrix K
+        :return: feedforward term
+        """
+
+        mass_ = m_f + m_r
+        wheelbase_ = l_f + l_r
+
+        kv = l_r * mass_ / 2.0 / c_f / wheelbase_ - \
+             l_f * mass_ / 2.0 / c_r / wheelbase_
+
+        v = vehicle_state.v
+
+        if vehicle_state.gear == Gear.GEAR_REVERSE:
+            steer_angle_feedforward = wheelbase_ * ref_curvature
+        else:
+            steer_angle_feedforward = wheelbase_ * ref_curvature + kv * v * v * ref_curvature - \
+                                      matrix_k_[0][2] * \
+                                      (l_r * ref_curvature -
+                                       l_f * mass_ * v * v * ref_curvature / 2.0 / c_r / wheelbase_)
+
+        return steer_angle_feedforward
 
     @staticmethod
     def SolveLQRProblem(A, B, Q, R, tolerance, max_num_iteration):
