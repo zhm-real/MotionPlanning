@@ -5,8 +5,10 @@ LQR controller for autonomous vehicle
 This controller is the python version of LQR controller of Apollo.
 GitHub link of BaiDu Apollo: https://github.com/ApolloAuto/apollo
 
-In this file, we will use hybrid A* planner for path planning, while using
-LQR with parameters in Apollo as controller for path tracking.
+Modules in this file:
+[Path Planner: ] Hybrid A*
+[Lateral Controller: ] LQR (parameters from Apollo)
+[Longitudinal Controller: ] PID
 """
 
 import os
@@ -20,6 +22,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)) +
                 "/../../MotionPlanning/")
 
 import HybridAstarPlanner.hybrid_astar as HybridAStar
+import CurvesGenerator.cubic_spline as cs
 import HybridAstarPlanner.draw as draw
 from Control.lateral_controller_conf import *
 
@@ -53,8 +56,8 @@ class VehicleState:
         :param gear: gear mode [GEAR_DRIVE / GEAR/REVERSE]
         """
 
-        delta, a = self.RegulateInput(delta, a)
         wheelbase_ = l_r + l_f
+        delta, a = self.RegulateInput(delta, a)
 
         self.gear = gear
         self.x += self.v * math.cos(self.yaw) * ts
@@ -171,11 +174,9 @@ class TrajectoryAnalyzer:
 
 
 class LatController:
-    def __init__(self):
-        self.ts_ = ts
-        self.mass_ = m_f + m_r
-        self.wheelbase_ = l_f + l_r
-        self.vehicle_state = VehicleState()
+    """
+    Lateral Controller using LQR
+    """
 
     def ComputeControlCommand(self, vehicle_state, ref_trajectory):
         """
@@ -192,7 +193,7 @@ class LatController:
         theta_e, e_cg, yaw_ref, k_ref = \
             ref_trajectory.ToTrajectoryFrame(vehicle_state)
 
-        matrix_ad_, matrix_bd_ = self.UpdateMatrix()
+        matrix_ad_, matrix_bd_ = self.UpdateMatrix(vehicle_state)
 
         matrix_state_ = np.zeros((state_size, 1))
         matrix_r_ = np.zeros((1, 1))
@@ -212,7 +213,7 @@ class LatController:
 
         steer_angle = steer_angle_feedback + steer_angle_feedforward
 
-        return steer_angle
+        return steer_angle, theta_e, e_cg
 
     @staticmethod
     def ComputeFeedForward(vehicle_state, ref_curvature, matrix_k_):
@@ -264,7 +265,7 @@ class LatController:
                np.size(R, 0) == np.size(B, 1), \
             "LQR solver: one or more matrices have incompatible dimensions."
 
-        M = np.zeros(np.size(Q, 0), np.size(R, 1))
+        M = np.zeros((np.size(Q, 0), np.size(R, 1)))
 
         AT = A.T
         BT = B.T
@@ -277,7 +278,7 @@ class LatController:
         while num_iteration < max_num_iteration and diff > tolerance:
             num_iteration += 1
             P_next = AT @ P @ A - \
-                     (AT @ P @ B + M) @ np.linalg.inv(R + BT @ P @ B) @ (BT @ P @ A + MT) + Q
+                     (AT @ P @ B + M) @ np.linalg.pinv(R + BT @ P @ B) @ (BT @ P @ A + MT) + Q
 
             # check the difference between P and P_next
             diff = abs(P_next - P).max()
@@ -291,20 +292,21 @@ class LatController:
 
         return K
 
-    def UpdateMatrix(self):
+    @staticmethod
+    def UpdateMatrix(vehicle_state):
         """
         calc A and b matrices of linearized, discrete system.
         :return: A, b
         """
 
-        ts_ = self.ts_
-        mass_ = self.mass_
+        ts_ = ts
+        mass_ = m_f + m_r
 
-        v = self.vehicle_state.v
+        v = vehicle_state.v
 
         matrix_a_ = np.zeros((state_size, state_size))  # continuous A matrix
 
-        if self.vehicle_state.gear == Gear.GEAR_REVERSE:
+        if vehicle_state.gear == Gear.GEAR_REVERSE:
             """
             A matrix (Gear Reverse)
             [0.0, 0.0, 1.0 * v 0.0;
@@ -353,6 +355,32 @@ class LatController:
         return matrix_ad_, matrix_bd_
 
 
+class LonController:
+    """
+    Longitudinal Controller using PID.
+    """
+
+    @staticmethod
+    def ComputeControlCommand(target_speed, vehicle_state, dist):
+        """
+        calc acceleration command using PID.
+        :param target_speed: target speed [m / s]
+        :param vehicle_state: vehicle state
+        :param dist: distance to goal [m]
+        :return: control command (acceleration) [m / s^2]
+        """
+
+        a = 0.3 * (vehicle_state.v - target_speed)
+
+        if dist < 10.0:
+            if vehicle_state.v > 2.0:
+                a = -3.0
+            elif vehicle_state.v < -2:
+                a = -1.0
+
+        return a
+
+
 def pi_2_pi(angle):
     """
     regulate theta to -pi ~ pi.
@@ -372,7 +400,60 @@ def pi_2_pi(angle):
 
 
 def main():
-    return
+    ax = np.arange(0, 50, 0.5)
+    ay = [math.sin(ix / 5.0) * ix / 2.0 for ix in ax]
+
+    x, y, yaw, k, _ = cs.calc_spline_course(ax, ay, ds=ts)
+
+    ref_trajectory = TrajectoryAnalyzer(x, y, yaw, k)
+    vehicle_state = VehicleState(x=x[0], y=y[0], yaw=yaw[0], v=2.0, gear=Gear.GEAR_DRIVE)
+
+    lat_controller = LatController()
+    lon_controller = LonController()
+
+    time = 0.0
+    max_simulation_time = 500.0
+
+    target_speed = 30.0 / 3.6  # [m / s^2]
+    x_goal = x[-1]
+    y_goal = y[-1]
+
+    x_rec = []
+    y_rec = []
+    yaw_rec = []
+
+    while time < max_simulation_time:
+        time += ts
+
+        dist = math.hypot(vehicle_state.x - x_goal, vehicle_state.y - y_goal)
+
+        delta_opt, theta_e, e_cg = \
+            lat_controller.ComputeControlCommand(vehicle_state, ref_trajectory)
+
+        a_opt = \
+            lon_controller.ComputeControlCommand(target_speed, vehicle_state, dist)
+
+        vehicle_state.UpdateVehicleState(delta_opt, a_opt, e_cg, theta_e, Gear.GEAR_DRIVE)
+
+        if dist < 1.0:
+            break
+
+        x_rec.append(vehicle_state.x)
+        y_rec.append(vehicle_state.y)
+        yaw_rec.append(vehicle_state.yaw)
+
+        plt.cla()
+        plt.plot(x, y, color='gray', linewidth=2.0)
+        plt.plot(x_rec, y_rec, linewidth=2.0, color='darkviolet')
+        # draw.draw_car(x_rec[-1], y_rec[-1], yaw[-1], steer, C)
+        plt.axis("equal")
+        plt.title("LQR & PID: v=" + str(vehicle_state.v * 3.6)[:4] + "km/h")
+        plt.gcf().canvas.mpl_connect('key_release_event',
+                                     lambda event:
+                                     [exit(0) if event.key == 'escape' else None])
+        plt.pause(0.001)
+
+    plt.show()
 
 
 if __name__ == '__main__':
