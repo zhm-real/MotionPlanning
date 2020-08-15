@@ -2,6 +2,7 @@
 This repository implemented some common motion planners used on autonomous vehicles, including
 * [Hybrid A* Planner](https://ai.stanford.edu/~ddolgov/papers/dolgov_gpp_stair08.pdf)
 * [Frenet Optimal Trajectory](https://www.researchgate.net/publication/224156269_Optimal_Trajectory_Generation_for_Dynamic_Street_Scenarios_in_a_Frenet_Frame)
+* [Hierarchical Optimization-Based Collision Avoidance (H-OBCA)](https://ieeexplore.ieee.org/document/9062306) (Incomplete)
 
 Also, this repository provides some controllers for path tracking, including
 * [Pure Pursuit + PID](https://www.ri.cmu.edu/pub_files/pub3/coulter_r_craig_1992_1/coulter_r_craig_1992_1.pdf)
