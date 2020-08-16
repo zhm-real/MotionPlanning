@@ -14,11 +14,12 @@ Iz = 1436.24  # [kg m2]
 max_iteration = 150
 eps = 0.01
 
-matrix_q = [0.05, 0.0, 1.0, 0.0]
+matrix_q = [0.5, 0.0, 1.0, 0.0]
+matrix_r = [1.0]
 
 state_size = 4
 
 max_acceleration = 5.0  # [m / s^2]
-max_steer_angle = 0.3  # [rad]
+max_steer_angle = 1.0  # [rad]
 max_speed = 60  # [km/h]
 

@@ -22,8 +22,8 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)) +
                 "/../../MotionPlanning/")
 
 import HybridAstarPlanner.hybrid_astar as HybridAStar
-import CurvesGenerator.cubic_spline as cs
 import HybridAstarPlanner.draw as draw
+import CurvesGenerator.cubic_spline as cs
 from Control.lateral_controller_conf import *
 
 
@@ -150,12 +150,12 @@ class TrajectoryAnalyzer:
         ind_add = int(np.argmin(np.hypot(dx, dy)))
         dist = math.hypot(dx[ind_add], dy[ind_add])
 
-        # calc relative position of vehicle to ref path
+        # calc lateral relative position of vehicle to ref path
         vec_axle_rot_90 = np.array([[math.cos(yaw + math.pi / 2.0)],
                                     [math.sin(yaw + math.pi / 2.0)]])
 
-        vec_path_2_cg = np.array([[dx[ind_add] / dist],
-                                  [dy[ind_add] / dist]])
+        vec_path_2_cg = np.array([[dx[ind_add]],
+                                  [dy[ind_add]]])
 
         if np.dot(vec_axle_rot_90.T, vec_path_2_cg) > 0.0:
             e_cg = 1.0 * dist  # vehicle on the right of ref path
@@ -180,10 +180,10 @@ class LatController:
 
     def ComputeControlCommand(self, vehicle_state, ref_trajectory):
         """
-        calc LQR control command.
-        :param vehicle_state:
-        :param ref_trajectory:
-        :return:
+        calc lateral control command.
+        :param vehicle_state: vehicle state
+        :param ref_trajectory: reference trajectory (analyzer)
+        :return: steering angle (optimal u), theta_e, e_cg
         """
 
         ts_ = ts
@@ -196,7 +196,7 @@ class LatController:
         matrix_ad_, matrix_bd_ = self.UpdateMatrix(vehicle_state)
 
         matrix_state_ = np.zeros((state_size, 1))
-        matrix_r_ = np.zeros((1, 1))
+        matrix_r_ = np.diag(matrix_r)
         matrix_q_ = np.diag(matrix_q)
 
         matrix_k_ = self.SolveLQRProblem(matrix_ad_, matrix_bd_, matrix_q_,
@@ -207,7 +207,7 @@ class LatController:
         matrix_state_[2][0] = theta_e
         matrix_state_[3][0] = (theta_e - theta_e_old) / ts_
 
-        steer_angle_feedback = -matrix_k_ @ matrix_state_
+        steer_angle_feedback = -(matrix_k_ @ matrix_state_)[0][0]
 
         steer_angle_feedforward = self.ComputeFeedForward(vehicle_state, k_ref, matrix_k_)
 
@@ -281,14 +281,14 @@ class LatController:
                      (AT @ P @ B + M) @ np.linalg.pinv(R + BT @ P @ B) @ (BT @ P @ A + MT) + Q
 
             # check the difference between P and P_next
-            diff = abs(P_next - P).max()
+            diff = (abs(P_next - P)).max()
             P = P_next
 
         if num_iteration >= max_num_iteration:
             print("LQR solver cannot converge to a solution",
                   "last consecutive result diff is: ", diff)
 
-        K = np.linalg.inv(BT @ P @ B + R) * (BT @ P @ A + MT)
+        K = np.linalg.inv(BT @ P @ B + R) @ (BT @ P @ A + MT)
 
         return K
 
@@ -335,7 +335,7 @@ class LatController:
 
         matrix_a_[1][1] = -1.0 * (c_f + c_r) / mass_ / v
         matrix_a_[1][2] = (c_f + c_r) / mass_
-        matrix_a_[1][3] = (l_f * c_f - l_f * c_f) / mass_ / v
+        matrix_a_[1][3] = (l_r * c_r - l_f * c_f) / mass_ / v
         matrix_a_[2][3] = 1.0
         matrix_a_[3][1] = (l_r * c_r - l_f * c_f) / Iz / v
         matrix_a_[3][2] = (l_f * c_f - l_r * c_r) / Iz
@@ -343,7 +343,7 @@ class LatController:
 
         # Tustin's method (bilinear transform)
         matrix_i = np.eye(state_size)  # identical matrix
-        matrix_ad_ = np.linalg.pinv(matrix_i - ts_ * 0.5 * matrix_a_) * \
+        matrix_ad_ = np.linalg.pinv(matrix_i - ts_ * 0.5 * matrix_a_) @ \
                      (matrix_i + ts_ * 0.5 * matrix_a_)  # discrete A matrix
 
         # b = [0.0, c_f / m, 0.0, l_f * c_f / I_z].T
@@ -370,9 +370,9 @@ class LonController:
         :return: control command (acceleration) [m / s^2]
         """
 
-        a = 0.3 * (vehicle_state.v - target_speed)
+        a = 0.3 * (target_speed - vehicle_state.v)
 
-        if dist < 10.0:
+        if dist < 11.0:
             if vehicle_state.v > 2.0:
                 a = -3.0
             elif vehicle_state.v < -2:
@@ -401,12 +401,13 @@ def pi_2_pi(angle):
 
 def main():
     ax = np.arange(0, 50, 0.5)
-    ay = [math.sin(ix / 5.0) * ix / 2.0 for ix in ax]
+    ay = [math.sin(ix / 5.0) * ix / 3.0 for ix in ax]
 
     x, y, yaw, k, _ = cs.calc_spline_course(ax, ay, ds=ts)
 
     ref_trajectory = TrajectoryAnalyzer(x, y, yaw, k)
-    vehicle_state = VehicleState(x=x[0], y=y[0], yaw=yaw[0], v=2.0, gear=Gear.GEAR_DRIVE)
+
+    vehicle_state = VehicleState(x=x[0], y=y[0], yaw=yaw[0], v=1.0, gear=Gear.GEAR_DRIVE)
 
     lat_controller = LatController()
     lon_controller = LonController()
@@ -414,7 +415,7 @@ def main():
     time = 0.0
     max_simulation_time = 500.0
 
-    target_speed = 30.0 / 3.6  # [m / s^2]
+    target_speed = 25.0 / 3.6  # [m / s^2]
     x_goal = x[-1]
     y_goal = y[-1]
 
@@ -435,9 +436,6 @@ def main():
 
         vehicle_state.UpdateVehicleState(delta_opt, a_opt, e_cg, theta_e, Gear.GEAR_DRIVE)
 
-        if dist < 1.0:
-            break
-
         x_rec.append(vehicle_state.x)
         y_rec.append(vehicle_state.y)
         yaw_rec.append(vehicle_state.yaw)
@@ -452,6 +450,9 @@ def main():
                                      lambda event:
                                      [exit(0) if event.key == 'escape' else None])
         plt.pause(0.001)
+
+        if dist < 0.3 and abs(vehicle_state.v) < 5.0:
+            break
 
     plt.show()
 
