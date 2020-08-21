@@ -100,7 +100,7 @@ class QueuePrior:
 
     def put(self, item, priority):
         self.queue[item] = priority  # push 
-        
+
     def get(self):
         return self.queue.popitem()[0]  # pop out element with smallest priority
 
@@ -157,7 +157,6 @@ def hybrid_astar_planning(sx, sy, syaw, gx, gy, gyaw, ox, oy, xyreso, yawreso):
                 if open_set[node_ind].cost > node.cost:
                     open_set[node_ind] = node
                     qp.put(node_ind, calc_hybrid_cost(node, hmap, P))
-                    
 
     return extract_path(closed_set, fnode, nstart)
 
