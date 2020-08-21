@@ -7,6 +7,7 @@ import os
 import sys
 import math
 import heapq
+from heapdict import heapdict
 import time
 import numpy as np
 import matplotlib.pyplot as plt
@@ -92,16 +93,16 @@ class Path:
 
 class QueuePrior:
     def __init__(self):
-        self.queue = []
+        self.queue = heapdict()
 
     def empty(self):
         return len(self.queue) == 0  # if Q is empty
 
     def put(self, item, priority):
-        heapq.heappush(self.queue, (priority, item))  # reorder x using priority
-
+        self.queue[item] = priority  # push 
+        
     def get(self):
-        return heapq.heappop(self.queue)[1]  # pop out element with smallest priority
+        return self.queue.popitem()[0]  # pop out element with smallest priority
 
 
 def hybrid_astar_planning(sx, sy, syaw, gx, gy, gyaw, ox, oy, xyreso, yawreso):
@@ -155,6 +156,8 @@ def hybrid_astar_planning(sx, sy, syaw, gx, gy, gyaw, ox, oy, xyreso, yawreso):
             else:
                 if open_set[node_ind].cost > node.cost:
                     open_set[node_ind] = node
+                    qp.put(node_ind, calc_hybrid_cost(node, hmap, P))
+                    
 
     return extract_path(closed_set, fnode, nstart)
 
