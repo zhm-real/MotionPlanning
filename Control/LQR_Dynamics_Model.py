@@ -28,7 +28,7 @@ import CurvesGenerator.reeds_shepp as rs
 
 
 # Controller Config
-ts = 0.1  # [s]
+ts = 0.06  # [s]
 c_f = 155494.663  # [N / rad]
 c_r = 155494.663  # [N / rad]
 m_f = 570  # [kg]
@@ -39,7 +39,7 @@ Iz = 1436.24  # [kg m2]
 max_iteration = 150
 eps = 0.01
 
-matrix_q = [0.5, 0.0, 1.0, 0.0]
+matrix_q = [1.0, 0.0, 1.0, 0.0]
 matrix_r = [1.0]
 
 state_size = 4
@@ -306,8 +306,8 @@ class LatController:
 
         while num_iteration < max_num_iteration and diff > tolerance:
             num_iteration += 1
-            P_next = AT @ P @ A - \
-                     (AT @ P @ B + M) @ np.linalg.pinv(R + BT @ P @ B) @ (BT @ P @ A + MT) + Q
+            P_next = AT @ P @ A - (AT @ P @ B + M) @ \
+                     np.linalg.pinv(R + BT @ P @ B) @ (BT @ P @ A + MT) + Q
 
             # check the difference between P and P_next
             diff = (abs(P_next - P)).max()
@@ -399,12 +399,12 @@ class LonController:
         :return: control command (acceleration) [m / s^2]
         """
 
-        a = 0.3 * (target_speed - vehicle_state.v)
+        a = 0.3 * (target_speed - abs(vehicle_state.v))
 
         if dist < 11.0:
-            if vehicle_state.v > 2.0:
+            if abs(vehicle_state.v) > 2.0:
                 a = -3.0
-            elif vehicle_state.v < -2:
+            elif abs(vehicle_state.v) < -2:
                 a = -1.0
 
         return a
@@ -591,7 +591,7 @@ def main2():
             if gear[0] > 0:
                 target_speed = 25.0 / 3.6
             else:
-                target_speed = 15.0 / 3.6
+                target_speed = 10.0 / 3.6
 
             delta_opt, theta_e, e_cg = \
                 lat_controller.ComputeControlCommand(vehicle_state, ref_trajectory)
