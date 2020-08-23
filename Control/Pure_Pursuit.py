@@ -21,10 +21,10 @@ class C:
     Kp = 0.3  # proportional gain
 
     # system config
-    Ld = 3.0  # look ahead distance
+    Ld = 2.6  # look ahead distance
     kf = 0.1  # look forward gain
     dt = 0.1  # T step
-    dist_stop = 0.5  # stop distance
+    dist_stop = 0.7  # stop distance
     dc = 0.0
 
     # vehicle config
@@ -48,7 +48,7 @@ class Node:
         self.direct = direct
 
     def update(self, a, delta, direct):
-        delta = self.limit_input(delta)
+        # delta = self.limit_input(delta)
         self.x += self.v * math.cos(self.yaw) * C.dt
         self.y += self.v * math.sin(self.yaw) * C.dt
         self.yaw += self.v / C.WB * math.tan(delta) * C.dt
@@ -57,11 +57,11 @@ class Node:
 
     @staticmethod
     def limit_input(delta):
-        if delta > C.MAX_STEER:
-            return C.MAX_STEER
+        if delta > 1.2 * C.MAX_STEER:
+            return 1.2 * C.MAX_STEER
 
-        if delta < -C.MAX_STEER:
-            return -C.MAX_STEER
+        if delta < -1.2 * C.MAX_STEER:
+            return -1.2 * C.MAX_STEER
 
         return delta
 

@@ -13,7 +13,8 @@ import matplotlib.pyplot as plt
 sys.path.append(os.path.dirname(os.path.abspath(__file__)) +
                 "/../../MotionPlanning/")
 
-import Control.draw as draw
+import Control.draw_lqr as draw
+from Control.config_control import *
 import CurvesGenerator.reeds_shepp as rs
 
 
@@ -71,6 +72,7 @@ class VehicleState:
         self.theta_e = 0.0
 
         self.gear = gear
+        self.steer = 0.0
 
     def UpdateVehicleState(self, delta, a, e_cg, theta_e,
                            gear=Gear.GEAR_DRIVE):
@@ -87,6 +89,7 @@ class VehicleState:
         delta, a = self.RegulateInput(delta, a)
 
         self.gear = gear
+        self.steer = delta
         self.x += self.v * math.cos(self.yaw) * ts
         self.y += self.v * math.sin(self.yaw) * ts
         self.yaw += self.v / wheelbase_ * math.tan(delta) * ts
@@ -509,9 +512,9 @@ def main():
             plt.plot(x_all, y_all, color='gray', linewidth=2.0)
             plt.plot(x_rec, y_rec, linewidth=2.0, color='darkviolet')
             # plt.plot(x[ind], y[ind], '.r')
-            # draw.draw_car(x0, y0, yaw0, steer, C)
+            draw.draw_car(x0, y0, yaw0, -vehicle_state.steer)
             plt.axis("equal")
-            plt.title("LQR & PID: v=" + str(vehicle_state.v * 3.6)[:4] + "km/h")
+            plt.title("LQR (Kinematic): v=" + str(vehicle_state.v * 3.6)[:4] + "km/h")
             plt.gcf().canvas.mpl_connect('key_release_event',
                                          lambda event:
                                          [exit(0) if event.key == 'escape' else None])

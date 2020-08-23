@@ -1,52 +1,20 @@
 """
-LQR controller for autonomous vehicle
-@author: huiming zhou (zhou.hm0420@gmail.com)
-
-This controller is the python version of LQR controller of Apollo.
-GitHub link of BaiDu Apollo: https://github.com/ApolloAuto/apollo
-
-Modules in this file:
-[Path Planner: ] Hybrid A*
-[Lateral Controller: ] LQR (parameters from Apollo)
-[Longitudinal Controller: ] PID
+LQR and PID Controller
+author: huiming zhou
 """
 
 import os
 import sys
 import math
-import numpy as np
 from enum import Enum
 import matplotlib.pyplot as plt
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)) +
                 "/../../MotionPlanning/")
 
-import HybridAstarPlanner.hybrid_astar as HybridAStar
-import HybridAstarPlanner.draw as draw
-import CurvesGenerator.cubic_spline as cs
+import Control.draw_lqr as draw
+from Control.config_control import *
 import CurvesGenerator.reeds_shepp as rs
-
-
-# Controller Config
-ts = 0.06  # [s]
-c_f = 155494.663  # [N / rad]
-c_r = 155494.663  # [N / rad]
-m_f = 570  # [kg]
-m_r = 570  # [kg]
-l_f = 1.165  # [m]
-l_r = 1.165  # [m]
-Iz = 1436.24  # [kg m2]
-max_iteration = 150
-eps = 0.01
-
-matrix_q = [1.0, 0.0, 1.0, 0.0]
-matrix_r = [1.0]
-
-state_size = 4
-
-max_acceleration = 5.0  # [m / s^2]
-max_steer_angle = np.deg2rad(40)  # [rad]
-max_speed = 60 / 3.6  # [km/h]
 
 
 class Gear(Enum):
@@ -65,12 +33,12 @@ class VehicleState:
         self.theta_e = 0.0
 
         self.gear = gear
+        self.steer = 0.0
 
     def UpdateVehicleState(self, delta, a, e_cg, theta_e,
                            gear=Gear.GEAR_DRIVE):
         """
         update states of vehicle
-
         :param theta_e: yaw error to ref trajectory
         :param e_cg: lateral error to ref trajectory
         :param delta: steering angle [rad]
@@ -78,9 +46,10 @@ class VehicleState:
         :param gear: gear mode [GEAR_DRIVE / GEAR/REVERSE]
         """
 
-        wheelbase_ = l_r + l_f
+        wheelbase_ = wheelbase
         delta, a = self.RegulateInput(delta, a)
 
+        self.steer = delta
         self.gear = gear
         self.x += self.v * math.cos(self.yaw) * ts
         self.y += self.v * math.sin(self.yaw) * ts
@@ -100,7 +69,6 @@ class VehicleState:
         """
         regulate delta to : - max_steer_angle ~ max_steer_angle
         regulate a to : - max_acceleration ~ max_acceleration
-
         :param delta: steering angle [rad]
         :param a: acceleration [m / s^2]
         :return: regulated delta and acceleration
@@ -124,7 +92,6 @@ class VehicleState:
     def RegulateOutput(v):
         """
         regulate v to : -max_speed ~ max_speed
-
         :param v: calculated speed [m / s]
         :return: regulated speed
         """
@@ -153,10 +120,8 @@ class TrajectoryAnalyzer:
     def ToTrajectoryFrame(self, vehicle_state):
         """
         errors to trajectory frame
-
         theta_e = yaw_vehicle - yaw_ref_path
         e_cg = lateral distance of center of gravity (cg) in frenet frame
-
         :param vehicle_state: vehicle state (class VehicleState)
         :return: theta_e, e_cg, yaw_ref, k_ref
         """
@@ -203,7 +168,6 @@ class LatController:
     def ComputeControlCommand(self, vehicle_state, ref_trajectory):
         """
         calc lateral control command.
-
         :param vehicle_state: vehicle state
         :param ref_trajectory: reference trajectory (analyzer)
         :return: steering angle (optimal u), theta_e, e_cg
@@ -247,7 +211,6 @@ class LatController:
     def ComputeFeedForward(vehicle_state, ref_curvature, matrix_k_):
         """
         calc feedforward control term to decrease the steady error.
-
         :param vehicle_state: vehicle state
         :param ref_curvature: curvature of the target point in ref trajectory
         :param matrix_k_: feedback matrix K
@@ -276,7 +239,6 @@ class LatController:
     def SolveLQRProblem(A, B, Q, R, tolerance, max_num_iteration):
         """
         iteratively calculating feedback matrix K
-
         :param A: matrix_a_
         :param B: matrix_b_
         :param Q: matrix_q_
@@ -317,7 +279,7 @@ class LatController:
             print("LQR solver cannot converge to a solution",
                   "last consecutive result diff is: ", diff)
 
-        K = np.linalg.inv(BT @ P @ B + R) @ (BT @ P @ A + MT)  # feedback gain
+        K = np.linalg.inv(BT @ P @ B + R) @ (BT @ P @ A + MT)
 
         return K
 
@@ -362,7 +324,7 @@ class LatController:
             matrix_a_[0][1] = 1.0
             matrix_a_[0][2] = 0.0
 
-        matrix_a_[1][1] = -1.0 * (c_f + c_r) / mass_ / v
+        matrix_a_[1][1] = -1.0 * ( + c_r) / mass_ / v
         matrix_a_[1][2] = (c_f + c_r) / mass_
         matrix_a_[1][3] = (l_r * c_r - l_f * c_f) / mass_ / v
         matrix_a_[2][3] = 1.0
@@ -399,12 +361,17 @@ class LonController:
         :return: control command (acceleration) [m / s^2]
         """
 
-        a = 0.3 * (target_speed - abs(vehicle_state.v))
+        if vehicle_state.gear == Gear.GEAR_DRIVE:
+            direct = 1.0
+        else:
+            direct = -1.0
 
-        if dist < 11.0:
-            if abs(vehicle_state.v) > 2.0:
+        a = 0.3 * (target_speed - direct * vehicle_state.v)
+
+        if dist < 10.0:
+            if vehicle_state.v > 2.0:
                 a = -3.0
-            elif abs(vehicle_state.v) < -2:
+            elif vehicle_state.v < -2:
                 a = -1.0
 
         return a
@@ -435,7 +402,7 @@ def generate_path(s):
     :param s: objective positions and directions.
     :return: paths
     """
-    wheelbase_ = l_f + l_r
+    wheelbase_ = wheelbase
 
     max_c = math.tan(0.5 * max_steer_angle) / wheelbase_
     path_x, path_y, yaw, direct, rc = [], [], [], [], []
@@ -491,66 +458,6 @@ def generate_path(s):
 
 
 def main():
-    ax = np.arange(0, 50, 0.5)
-    ay = [math.sin(ix / 5.0) * ix / 3.0 for ix in ax]
-
-    x, y, yaw, k, _ = cs.calc_spline_course(ax, ay, ds=ts)
-
-    ref_trajectory = TrajectoryAnalyzer(x, y, yaw, k)  # Initialize Trajectory Analyzer
-
-    vehicle_state = VehicleState(x=x[0], y=y[0], yaw=yaw[0], v=1.0, gear=Gear.GEAR_DRIVE)
-
-    lat_controller = LatController()  # Initialize Lateral Controller (LQR)
-    lon_controller = LonController()  # Initialize Longitudinal Controller (PID)
-
-    time = 0.0
-    max_simulation_time = 500.0
-
-    target_speed = 25.0 / 3.6  # [m / s^2]
-    x_goal = x[-1]
-    y_goal = y[-1]
-
-    x_rec = []
-    y_rec = []
-    yaw_rec = []
-
-    while time < max_simulation_time:
-        time += ts
-
-        dist = math.hypot(vehicle_state.x - x_goal, vehicle_state.y - y_goal)
-
-        delta_opt, theta_e, e_cg = \
-            lat_controller.ComputeControlCommand(vehicle_state, ref_trajectory)  # Lateral Control Command
-
-        a_opt = \
-            lon_controller.ComputeControlCommand(target_speed, vehicle_state, dist)  # Lon Control Command
-
-        vehicle_state.UpdateVehicleState(delta_opt, a_opt, e_cg, theta_e, Gear.GEAR_DRIVE)
-
-        x_rec.append(vehicle_state.x)
-        y_rec.append(vehicle_state.y)
-        yaw_rec.append(vehicle_state.yaw)
-
-        # animation
-        plt.cla()
-        plt.plot(x, y, color='gray', linewidth=2.0)
-        plt.plot(x_rec, y_rec, linewidth=2.0, color='darkviolet')
-        # draw.draw_car(x_rec[-1], y_rec[-1], yaw[-1], steer, C)
-        plt.axis("equal")
-        plt.title("LQR & PID: v=" + str(vehicle_state.v * 3.6)[:4] + "km/h")
-        plt.gcf().canvas.mpl_connect('key_release_event',
-                                     lambda event:
-                                     [exit(0) if event.key == 'escape' else None])
-        plt.pause(0.001)
-
-        # Stop condition
-        if dist < 0.3 and abs(vehicle_state.v) < 5.0:
-            break
-
-    plt.show()
-
-
-def main2():
     # generate path
     states = [(0, 0, 0), (20, 15, 0), (35, 20, 90), (40, 0, 180),
               (20, 0, 120), (5, -10, 180), (15, 5, 30)]
@@ -559,8 +466,6 @@ def main2():
     #           (35, 10, 180), (30, -10, 160), (5, -12, 90)]
 
     x_ref, y_ref, yaw_ref, direct, curv, x_all, y_all = generate_path(states)
-
-    wheelbase_ = l_f + l_r
 
     maxTime = 100.0
     yaw_old = 0.0
@@ -591,14 +496,14 @@ def main2():
             if gear[0] > 0:
                 target_speed = 25.0 / 3.6
             else:
-                target_speed = 10.0 / 3.6
+                target_speed = 15.0 / 3.6
 
             delta_opt, theta_e, e_cg = \
                 lat_controller.ComputeControlCommand(vehicle_state, ref_trajectory)
 
             a_opt = lon_controller.ComputeControlCommand(target_speed, vehicle_state, dist)
 
-            vehicle_state.UpdateVehicleState(delta_opt, a_opt, e_cg, theta_e, direct)
+            vehicle_state.UpdateVehicleState(pi_2_pi(delta_opt), a_opt, e_cg, theta_e, direct)
 
             t += ts
 
@@ -609,10 +514,6 @@ def main2():
             y_rec.append(vehicle_state.y)
             yaw_rec.append(vehicle_state.yaw)
 
-            dy = (vehicle_state.yaw - yaw_old) / (vehicle_state.v * ts)
-            # steer = rs.pi_2_pi(-math.atan(wheelbase_ * dy))
-
-            yaw_old = vehicle_state.yaw
             x0 = x_rec[-1]
             y0 = y_rec[-1]
             yaw0 = yaw_rec[-1]
@@ -620,10 +521,9 @@ def main2():
             plt.cla()
             plt.plot(x_all, y_all, color='gray', linewidth=2.0)
             plt.plot(x_rec, y_rec, linewidth=2.0, color='darkviolet')
-            # plt.plot(x[ind], y[ind], '.r')
-            # draw.draw_car(x0, y0, yaw0, steer, C)
+            draw.draw_car(x0, y0, yaw0, -vehicle_state.steer)
             plt.axis("equal")
-            plt.title("LQR & PID: v=" + str(vehicle_state.v * 3.6)[:4] + "km/h")
+            plt.title("LQR (Dynamics): v=" + str(vehicle_state.v * 3.6)[:4] + "km/h")
             plt.gcf().canvas.mpl_connect('key_release_event',
                                          lambda event:
                                          [exit(0) if event.key == 'escape' else None])
@@ -633,5 +533,4 @@ def main2():
 
 
 if __name__ == '__main__':
-    # main()
-    main2()
+    main()
