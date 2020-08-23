@@ -353,8 +353,8 @@ def pi_2_pi(angle):
 
 
 def main():
-    ax = [0.0, 20.0, 40.0, 55.0, 70.0, 85.0]
-    ay = [0.0, 50.0, 20.0, 35.0, 0.0, 10.0]
+    ax = [0.0, 15.0, 30.0, 50.0, 60.0]
+    ay = [0.0, 40.0, 15.0, 30.0, 0.0]
     cx, cy, cyaw, ck, s = cs.calc_spline_course(
         ax, ay, ds=P.d_dist)
 
@@ -404,18 +404,21 @@ def main():
                 abs(node.v) < P.speed_stop:
             break
 
+        dy = (node.yaw - yaw[-2]) / (node.v * P.dt)
+        steer = rs.pi_2_pi(-math.atan(P.WB * dy))
+
         plt.cla()
+        draw.draw_car(node.x, node.y, node.yaw, steer, P)
         plt.gcf().canvas.mpl_connect('key_release_event',
                                      lambda event:
                                      [exit(0) if event.key == 'escape' else None])
 
         if x_opt is not None:
-            plt.plot(x_opt, y_opt, 'xr')
+            plt.plot(x_opt, y_opt, color='darkviolet', marker='*')
 
-        plt.plot(cx, cy, '-r')
+        plt.plot(cx, cy, color='gray')
         plt.plot(x, y, '-b')
-        plt.plot(z_ref[0, :], z_ref[1, :], 'xk')
-        plt.plot(cx[target_ind], cy[target_ind], 'xg')
+        plt.plot(cx[target_ind], cy[target_ind])
         plt.axis("equal")
         plt.title("Linear MPC, " + "v = " + str(round(node.v * 3.6, 2)))
         plt.pause(0.001)

@@ -4,14 +4,13 @@ import math
 import copy
 import numpy as np
 import matplotlib.pyplot as plt
-import scipy.spatial.kdtree as kd
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)) +
                 "/../../MotionPlanning/")
 
 from CurvesGenerator import cubic_spline, quintic_polynomial, quartic_polynomial
-import StateLatticePlanner.env as env
-import StateLatticePlanner.draw as draw
+import LatticePlanner.env as env
+import LatticePlanner.draw as draw
 
 
 class C:
@@ -23,26 +22,26 @@ class C:
     ROAD_WIDTH = 8.0
     ROAD_SAMPLE_STEP = 1.0
 
-    T_STEP = 0.150
+    T_STEP = 0.15
     MAX_T = 5.0
     MIN_T = 4.0
 
     TARGET_SPEED = 30.0 / 3.6
     SPEED_SAMPLE_STEP = 5.0 / 3.6
 
-    # cost weights
-    # K_JERK = 0.1
-    # K_TIME = 0.1
-    # K_V_DIFF = 1.0
-    # K_OFFSET = 1.5
-    # K_COLLISION = 500
-
-    # cost weights for Stopping
+    # cost weights for Cruising
     K_JERK = 0.1
     K_TIME = 0.1
-    K_V_DIFF = 200
-    K_OFFSET = 1.0
+    K_V_DIFF = 1.0
+    K_OFFSET = 1.5
     K_COLLISION = 500
+
+    # cost weights for Stopping
+    # K_JERK = 0.1
+    # K_TIME = 0.1
+    # K_V_DIFF = 200
+    # K_OFFSET = 1.0
+    # K_COLLISION = 500
 
     # parameters for vehicle
     K_SIZE = 0.9
@@ -82,7 +81,7 @@ class Path:
 def sampling_paths_for_Cruising(l0, l0_v, l0_a, s0, s0_v, s0_a, ref_path):
     PATHS = dict()
 
-    for s1_v in np.arange(C.TARGET_SPEED * 0.5, C.TARGET_SPEED * 1.2, C.TARGET_SPEED * 0.2):
+    for s1_v in np.arange(C.TARGET_SPEED * 0.6, C.TARGET_SPEED * 1.4, C.TARGET_SPEED * 0.2):
 
         for t1 in np.arange(4.5, 5.5, 0.2):
             path_pre = Path()
@@ -423,5 +422,5 @@ def main_Stopping():
 
 
 if __name__ == '__main__':
-    # main_Crusing()
-    main_Stopping()
+    main_Crusing()
+    # main_Stopping()
