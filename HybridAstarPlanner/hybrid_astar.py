@@ -462,12 +462,12 @@ def design_obstacles(x, y):
 
     for i in range(x):
         ox.append(i)
-        oy.append(0)
+        oy.append(-10)
     for i in range(x):
         ox.append(i)
         oy.append(y - 1)
     for i in range(y):
-        ox.append(0)
+        ox.append(-10)
         oy.append(i)
     for i in range(y):
         ox.append(x - 1)
