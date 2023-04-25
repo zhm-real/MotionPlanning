@@ -15,12 +15,12 @@ import LatticePlanner.draw as draw
 
 class C:
     # Parameter
-    MAX_SPEED = 50.0 / 3.6
-    MAX_ACCEL = 8.0
-    MAX_CURVATURE = 2.5
+    MAX_SPEED = 50.0 / 3.6 # 控制最大速度
+    MAX_ACCEL = 8.0        # 控制最大加速度
+    MAX_CURVATURE = 2.5    # 最大转向角？？
 
-    ROAD_WIDTH = 8.0
-    ROAD_SAMPLE_STEP = 1.0
+    ROAD_WIDTH = 8.0       # 道路宽度
+    ROAD_SAMPLE_STEP = 1.0 # 横向采样的间距
 
     T_STEP = 0.15
     MAX_T = 5.0
@@ -56,6 +56,11 @@ class C:
 
 
 class Path:
+    '''
+    l: frenet的横向上的信息
+    s: frenet的纵向上的信息
+    x,y 笛卡尔坐标系的信息
+    '''
     def __init__(self):
         self.t = []
 
@@ -72,43 +77,50 @@ class Path:
         self.x = []
         self.y = []
         self.yaw = []
-        self.ds = []
+        self.ds = [] #速度？
         self.curv = []
 
         self.cost = 0.0
 
 
 def sampling_paths_for_Cruising(l0, l0_v, l0_a, s0, s0_v, s0_a, ref_path):
+    '''
+    l0: 横向上的位置
+    l0_v: 横向上的速度
+    l0_a: 横向上的加速度
+    s0: 纵向上的位置
+    s0_v: 纵向上的速度
+    s0_a: 纵向上的加速度
+    ref_path: 参考线
+    '''
     PATHS = dict()
-
     for s1_v in np.arange(C.TARGET_SPEED * 0.6, C.TARGET_SPEED * 1.4, C.TARGET_SPEED * 0.2):
-
+        # target 速度不同来采样
         for t1 in np.arange(4.5, 5.5, 0.2):
+            # target time不同来采样
             path_pre = Path()
+            # 纵向target a按照0来计算
             path_lon = quartic_polynomial.QuarticPolynomial(s0, s0_v, s0_a, s1_v, 0.0, t1)
-
             path_pre.t = list(np.arange(0.0, t1, C.T_STEP))
             path_pre.s = [path_lon.calc_xt(t) for t in path_pre.t]
             path_pre.s_v = [path_lon.calc_dxt(t) for t in path_pre.t]
             path_pre.s_a = [path_lon.calc_ddxt(t) for t in path_pre.t]
             path_pre.s_jerk = [path_lon.calc_dddxt(t) for t in path_pre.t]
-
             for l1 in np.arange(-C.ROAD_WIDTH, C.ROAD_WIDTH, C.ROAD_SAMPLE_STEP):
+                # 横向上采样
                 path = copy.deepcopy(path_pre)
+                # 横向上target v和target a都应该是0
                 path_lat = quintic_polynomial.QuinticPolynomial(l0, l0_v, l0_a, l1, 0.0, 0.0, t1)
-
                 path.l = [path_lat.calc_xt(t) for t in path_pre.t]
                 path.l_v = [path_lat.calc_dxt(t) for t in path_pre.t]
                 path.l_a = [path_lat.calc_ddxt(t) for t in path_pre.t]
                 path.l_jerk = [path_lat.calc_dddxt(t) for t in path_pre.t]
-
+                # frenet转笛卡尔
                 path.x, path.y = SL_2_XY(path.s, path.l, ref_path)
                 path.yaw, path.curv, path.ds = calc_yaw_curv(path.x, path.y)
-
                 l_jerk_sum = sum(np.abs(path.l_jerk))
                 s_jerk_sum = sum(np.abs(path.s_jerk))
                 v_diff = abs(C.TARGET_SPEED - path.s_v[-1])
-
                 path.cost = C.K_JERK * (l_jerk_sum + s_jerk_sum) + \
                             C.K_V_DIFF * v_diff + \
                             C.K_TIME * t1 * 2 + \
@@ -116,7 +128,6 @@ def sampling_paths_for_Cruising(l0, l0_v, l0_a, s0, s0_v, s0_a, ref_path):
                             C.K_COLLISION * is_path_collision(path)
 
                 PATHS[path] = path.cost
-
     return PATHS
 
 

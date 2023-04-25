@@ -1,13 +1,13 @@
 """
 Dubins Path
+https://zhuanlan.zhihu.com/p/414753861
 """
 
 import math
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.spatial.transform import Rotation as Rot
-
-from CurvesGenerator import draw
+import draw
 
 
 # class for PATH element
@@ -282,14 +282,14 @@ def calc_dubins_path(sx, sy, syaw, gx, gy, gyaw, curv, step_size=0.1):
     gx = gx - sx
     gy = gy - sy
 
-    l_rot = Rot.from_euler('z', syaw).as_dcm()[0:2, 0:2]
+    l_rot = Rot.from_euler('z', syaw).as_matrix()[0:2, 0:2]
     le_xy = np.stack([gx, gy]).T @ l_rot
     le_yaw = gyaw - syaw
 
     lp_x, lp_y, lp_yaw, mode, lengths = planning_from_origin(
         le_xy[0], le_xy[1], le_yaw, curv, step_size)
 
-    rot = Rot.from_euler('z', -syaw).as_dcm()[0:2, 0:2]
+    rot = Rot.from_euler('z', -syaw).as_matrix()[0:2, 0:2]
     converted_xy = np.stack([lp_x, lp_y]).T @ rot
     x_list = converted_xy[:, 0] + sx
     y_list = converted_xy[:, 1] + sy
@@ -301,12 +301,12 @@ def calc_dubins_path(sx, sy, syaw, gx, gy, gyaw, curv, step_size=0.1):
 def main():
     # choose states pairs: (x, y, yaw)
     # simulation-1
-    states = [(0, 0, 0), (10, 10, -90), (20, 5, 60), (30, 10, 120),
-              (35, -5, 30), (25, -10, -120), (15, -15, 100), (0, -10, -90)]
+    # states = [(0, 0, 0), (10, 10, -90), (20, 5, 60), (30, 10, 120),
+    #           (35, -5, 30), (25, -10, -120), (15, -15, 100), (0, -10, -90)]
 
     # simulation-2
-    # states = [(-3, 3, 120), (10, -7, 30), (10, 13, 30), (20, 5, -25),
-    #           (35, 10, 180), (32, -10, 180), (5, -12, 90)]
+    states = [(-3, 3, 120), (10, -7, 30), (10, 13, 30), (20, 5, -25),
+              (35, 10, 180), (32, -10, 180), (5, -12, 90)]
 
     max_c = 0.25  # max curvature
     path_x, path_y, yaw = [], [], []

@@ -1,12 +1,14 @@
 """
 Quintic Polynomial
+五次多项式
+https://blog.csdn.net/weixin_43794327/article/details/123335112
 """
 
 import math
 import numpy as np
 import matplotlib.pyplot as plt
 
-from CurvesGenerator import draw
+import draw
 
 
 class QuinticPolynomial:
