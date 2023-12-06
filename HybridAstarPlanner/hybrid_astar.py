@@ -7,7 +7,7 @@ import os
 import sys
 import math
 import heapq
-from heapdict import heapdict
+from heapdict import heapdict ## pip install HeadDict
 import time
 import numpy as np
 import matplotlib.pyplot as plt
