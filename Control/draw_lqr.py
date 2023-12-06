@@ -1,5 +1,5 @@
 import matplotlib.pyplot as plt
-from Control.config_control import *
+from config_control import *
 
 PI = np.pi
 
@@ -78,8 +78,9 @@ def draw_car(x, y, yaw, steer, color='black'):
     plt.plot(flWheel[0, :], flWheel[1, :], color)
     plt.plot(rlWheel[0, :], rlWheel[1, :], color)
     Arrow(x, y, yaw, 0.8 * wheelbase, color)
+    print("is this configed?")
     plt.axis("equal")
-    # plt.show()
+    plt.show()
 
 
 if __name__ == '__main__':
